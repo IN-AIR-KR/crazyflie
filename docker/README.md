@@ -116,7 +116,8 @@ docker compose -f docker/compose.yml -f docker/compose.gpu.yml exec firmware nvi
 
 ## 알려진 갭 / 참고사항
 
-- `cflib`은 crazyswarm2의 `crazyflie_server_py`/`flash.py`가 실제로 쓰지만 upstream 어디에도 의존성으로 선언되어 있지 않다. `docker/basic/requirements.txt`에 명시적으로 pin 해뒀다 — 지우지 말 것.
+- `cflib`, `transforms3d`, `rowan`, `matplotlib`은 crazyswarm2(`crazyflie_server_py`/`crazyflie_py`/`crazyflie_sim`)가 실제로 import하지만, `<depend>`가 apt로 안 풀리거나(`transforms3d`) 아예 선언 자체가 없어서(`cflib`, `rowan`, `matplotlib`) colcon 빌드로는 설치되지 않는다. `docker/basic/requirements.txt`에 명시적으로 pin 해뒀다 — 지우지 말 것.
+- `backend:=sim`은 `cffirmware`(firmware의 control/estimator 코드를 SWIG로 감싼 Python 바인딩)가 필요하다. PyPI에 없어서 `crazyflie-firmware` 소스로부터 직접 빌드해야 하는데, `basic` 컨테이너에도 `crazyflie-firmware`를 마운트해두고 `entrypoint.sh`가 최초 접속 시 `make bindings_python`으로 자동 빌드한다. `firmware`/`basic` 두 컨테이너가 이 빌드 산출물(`crazyflie-firmware/build/`)을 공유하는데 Python 버전이 서로 다르므로(`firmware`는 pixi의 Python, `basic`은 3.12), `entrypoint.sh`는 파일 존재 여부가 아니라 실제 `import cffirmware`가 되는지로 재빌드 여부를 판단한다.
 - 호스트의 `cf_ws/build|install|log|cache`는 예전에 ROS 2 Humble로 빌드된 산출물로, 이 Docker 환경에서는 전혀 사용하지 않는다 (컨테이너는 named volume에 자체 빌드 산출물을 갖는다). 안전하게 `rm -rf cf_ws/build cf_ws/install cf_ws/log cf_ws/cache`로 지워도 된다.
 - `pixi.toml`/`package.xml` 등 의존성 정의가 바뀌면 이미지를 다시 빌드해야 한다: `docker compose -f docker/compose.yml build --no-cache <서비스명>`.
 - colcon 빌드 산출물을 완전히 초기화하려면 `docker compose -f docker/compose.yml down -v` (named volume까지 삭제).
