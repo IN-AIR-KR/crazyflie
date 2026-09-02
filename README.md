@@ -22,23 +22,49 @@ crazyflie/
 - (선택) GPU를 쓸 경우 `nvidia-container-toolkit`
 - Crazyradio PA 또는 Crazyflie USB 동글
 
-## 퀵스타트
+## 퀵스타트 (처음 하시는 분용, 순서대로 따라하면 됩니다)
+
+### 0. 저장소 받기 (최초 1회)
 
 ```bash
 git clone --recursive <이 저장소 URL> crazyflie
 cd crazyflie
+```
+이미 로컬에 폴더가 있다면 이 단계는 건너뛰세요.
 
+### 1. UID/GID 설정 (최초 1회)
+
+컨테이너 안에서 만든 파일이 호스트에서 root 소유가 되지 않도록 내 계정 정보를 넣어둡니다.
+
+```bash
 echo "UID=$(id -u)" > docker/.env
 echo "GID=$(id -g)" >> docker/.env
+```
 
+### 2. X11 GUI 권한 허용 (터미널을 새로 열거나 재부팅할 때마다 1회)
+
+rviz2, cfclient 같은 GUI 프로그램을 컨테이너 안에서 띄우려면 필요합니다.
+
+```bash
 xhost +local:docker
+```
 
+### 3. 이미지 빌드 + 컨테이너 기동
+
+```bash
 docker compose -f docker/compose.yml build
 docker compose -f docker/compose.yml up -d
-# GPU가 있다면 위 두 줄 대신:
-#   docker compose -f docker/compose.yml -f docker/compose.gpu.yml build
-#   docker compose -f docker/compose.yml -f docker/compose.gpu.yml up -d
+```
 
+GPU가 있는 컴퓨터라면 (선택, `nvidia-container-toolkit` 설치 필요) 위 두 줄 대신:
+```bash
+docker compose -f docker/compose.yml -f docker/compose.gpu.yml build
+docker compose -f docker/compose.yml -f docker/compose.gpu.yml up -d
+```
+
+### 4. `basic` 컨테이너 접속 → 시뮬레이션으로 동작 확인 (드론 없이 가능)
+
+```bash
 docker compose -f docker/compose.yml exec basic bash
 ```
 
@@ -49,6 +75,31 @@ colcon build --symlink-install
 source install/setup.bash
 ros2 launch crazyflie_test launch.py mode:=opticalflow backend:=sim
 ```
+첫 `colcon build`는 crazyswarm2 전체를 빌드해서 시간이 좀 걸립니다. 완료되면 새 터미널에서 아래 명령으로 rviz2를 띄워 시각화까지 확인해보세요.
 
-자세한 서비스별 설정, USB/GPU/X11 트러블슈팅, 알려진 이슈는 [`docker/README.md`](docker/README.md)를 참고.
-# crazyflie
+```bash
+docker compose -f docker/compose.yml exec basic bash -c "source install/setup.bash && rviz2"
+```
+
+### 5. `firmware` 컨테이너 접속 → cfclient GUI 확인
+
+```bash
+docker compose -f docker/compose.yml exec firmware bash
+pixi run cfclient
+```
+최초 실행 시 `pixi install`이 자동으로 한 번 더 돌아갑니다 (시간이 좀 걸릴 수 있음).
+
+### 6. 실제 드론(Crazyflie)으로 테스트할 때
+
+1. 컴퓨터에 Crazyradio를 꽂습니다.
+2. 컨테이너가 이미 실행 중이었다면 컨테이너 안에서 `fix-usb-perms`를 한 번 실행합니다 (새로 띄우는 경우는 자동 처리되어 생략 가능).
+3. `firmware` 컨테이너의 cfclient에서 "Scan"으로 라디오/드론을 찾아 연결하고, 필요하면 Bootloader 탭으로 펌웨어를 플래시합니다.
+4. `basic` 컨테이너로 실비행 예제를 돌리려면 `cf_ws/src/crazyflie-basic/crazyflie_test/config/crazyflies_<mode>.yaml`에서 `uri`(라디오 주소)를 실제 드론에 맞게 수정한 뒤 `backend:=cflib`로 launch합니다.
+
+### 7. 끝났으면 정리
+
+```bash
+docker compose -f docker/compose.yml down
+```
+
+막히는 부분(USB/GPU/X11 등)은 [`docker/README.md`](docker/README.md)의 트러블슈팅 섹션을 참고하세요.
