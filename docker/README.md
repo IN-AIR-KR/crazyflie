@@ -41,6 +41,18 @@ xhost +local:docker
 
 더 강한 격리가 필요하면, 호스트에 표준 Bitcraze `99-bitcraze.rules`를 설치하고 `plugdev` 그룹에 사용자를 추가한 뒤, compose에서 `privileged: true`를 제거하고 `devices:`로 정확한 `/dev/bus/usb/<bus>/<device>` 경로만 지정하는 방식으로 바꿀 수 있다.
 
+**주의**: `privileged: true`는 커널 device cgroup 제약만 풀어줄 뿐, `/dev/bus/usb/*` 장치 파일 자체의 유닉스 권한(대개 `root:root`, 660)까지 바꿔주지는 않는다. 그래서 두 이미지 모두 entrypoint에서 컨테이너 시작 시 `fix-usb-perms`(`sudo chmod -R o+rw /dev/bus/usb`)를 자동 실행해 non-root `dev` 유저도 Crazyradio/Crazyflie USB에 접근할 수 있게 해뒀다. **컨테이너가 이미 떠 있는 상태에서 Crazyradio를 새로 꽂았다면** (최초 chmod 시점을 놓치므로) 컨테이너 안에서 다시 실행:
+
+```bash
+fix-usb-perms
+```
+
+연결 확인:
+
+```bash
+lsusb | grep -i "1915:7777\|Bitcraze"   # Crazyradio PA
+```
+
 ## UID/GID (bind mount 파일 소유권)
 
 컨테이너 안에서 생성된 파일이 호스트에서 root 소유가 되지 않도록, 빌드 전에 `docker/.env`를 만든다:
@@ -81,7 +93,21 @@ docker compose -f docker/compose.yml exec firmware bash
 pixi run cfclient
 ```
 
-**GPU 확인 (compose.gpu.yml을 얹었을 때):**
+## 실제 드론(하드웨어) 사용
+
+1. Crazyradio PA(또는 Crazyflie USB 동글)를 호스트에 꽂는다.
+2. 컨테이너가 이미 실행 중이었다면 `fix-usb-perms` 실행 (위 USB 섹션 참고). 컨테이너를 새로 띄우는 경우는 entrypoint가 자동으로 처리하므로 생략 가능.
+3. firmware 컨테이너에서 cfclient 실행:
+   ```bash
+   docker compose -f docker/compose.yml exec firmware bash
+   pixi run cfclient
+   ```
+   cfclient GUI에서 "Scan"으로 Crazyradio 인식 및 드론 주소(`radio://0/80/2M/E7E7E7E7E7` 등)를 확인하고 연결한다.
+4. 새로 빌드한 펌웨어를 실제 드론에 플래시하려면 cfclient의 Bootloader 탭(또는 CLI `cfloader`)을 사용한다. `crazyflie-firmware`는 `pixi run make`로 빌드하면 `build/` 아래 `.bin`이 생성된다 (호스트의 `crazyflie-firmware/build/`는 `.gitignore` 처리되어 있음).
+5. cfclient의 설정(스캔 이력, 로그 설정, 입력장치 매핑 등)은 `cfclient_config` named volume(`/home/dev/.config/cfclient`)에 저장되어 `docker compose down`/`up`을 반복해도 유지된다. 완전히 초기화하려면 `docker compose -f docker/compose.yml down -v`.
+6. `basic` 컨테이너로 실비행(mocap/opticalflow) 예제를 돌릴 때는 `cf_ws/src/crazyflie-basic/crazyflie_test/config/crazyflies_<mode>.yaml`(컨테이너 안에서는 `/workspace/cf_ws/src/crazyflie-basic/crazyflie_test/config/crazyflies_<mode>.yaml`)에서 `uri`(라디오 주소)와 `initial_position`을 실제 드론에 맞게 수정한 뒤 `backend:=cflib` 또는 `backend:=cpp`로 launch한다 (crazyflie-basic README의 `mode`/`backend` 조합 참고). `basic` 컨테이너도 동일한 `/dev/bus/usb` 마운트 + `fix-usb-perms`로 라디오에 접근한다.
+
+## GPU 확인 (compose.gpu.yml을 얹었을 때)
 
 ```bash
 docker compose -f docker/compose.yml -f docker/compose.gpu.yml exec basic nvidia-smi

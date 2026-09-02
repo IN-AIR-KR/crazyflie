@@ -4,6 +4,8 @@ set -e
 WS_DIR=/workspace/cf_ws
 SRC_DIR="$WS_DIR/src"
 
+fix-usb-perms
+
 if [ -d "$SRC_DIR" ]; then
     echo "[entrypoint] Running rosdep install against $SRC_DIR..."
     sudo rosdep install --from-paths "$SRC_DIR" --ignore-src -r -y || true

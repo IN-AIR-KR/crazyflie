@@ -15,7 +15,7 @@ services:
       - XAUTHORITY=/tmp/.docker.xauth
     volumes:
       - ../crazyflie-firmware:/workspace/crazyflie-firmware
-      - firmware_pixi_cache:/workspace/crazyflie-firmware/.pixi
+      - cfclient_config:/home/dev/.config/cfclient
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev/bus/usb:/dev/bus/usb
       - /etc/localtime:/etc/localtime:ro
@@ -51,7 +51,7 @@ services:
     tty: true
 
 volumes:
-  firmware_pixi_cache:
+  cfclient_config:
   cf_ws_build:
   cf_ws_install:
   cf_ws_log:
