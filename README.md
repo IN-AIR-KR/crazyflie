@@ -1,9 +1,9 @@
 # crazyflie
 
-Crazyflie 드론 개발을 위한 통합 저장소. 두 패키지를 git submodule로 묶고, Docker Compose로 팀원 누구나 동일한 개발 환경을 재현할 수 있도록 구성했다.
+Crazyflie 드론 개발을 위한 통합 저장소. Docker Compose로 팀원 누구나 동일한 개발 환경을 재현할 수 있도록 구성했다.
 
-- [`crazyflie-firmware/`](crazyflie-firmware/) — [bitcraze/crazyflie-firmware](https://github.com/bitcraze/crazyflie-firmware) fork. STM32 임베디드 펌웨어.
-- [`cf_ws/src/crazyflie-basic/`](cf_ws/src/crazyflie-basic/) — [IN-AIR-KR/crazyflie-basic](https://github.com/IN-AIR-KR/crazyflie-basic) fork. Crazyswarm2 기반 ROS 2 비행 예제.
+- [`crazyflie-firmware/`](crazyflie-firmware/) — [bitcraze/crazyflie-firmware](https://github.com/bitcraze/crazyflie-firmware) git submodule. 거의 건드릴 일 없는 STM32 임베디드 펌웨어라 upstream과 연결을 유지한다.
+- [`cf_ws/src/crazyflie-basic/`](cf_ws/src/crazyflie-basic/) — [IN-AIR-KR/crazyflie-basic](https://github.com/IN-AIR-KR/crazyflie-basic)에서 가져온 Crazyswarm2 기반 ROS 2 비행 예제. **submodule이 아니라 이 저장소 소속의 일반 파일**이다 — 원본 `crazyflie-basic`과는 연결이 끊겨 있어서, 여기서 무엇을 커밋/push해도 원본에는 영향이 없다. 대신 원본이 나중에 업데이트돼도 자동으로 따라오지 않으니, 필요하면 수동으로 반영해야 한다.
 
 ## 폴더 구조
 
@@ -11,7 +11,7 @@ Crazyflie 드론 개발을 위한 통합 저장소. 두 패키지를 git submodu
 crazyflie/
 ├── docker/                        # Docker Compose 환경 (아래 참고)
 ├── cf_ws/
-│   └── src/crazyflie-basic/       # git submodule
+│   └── src/crazyflie-basic/       # 일반 폴더 (원본과 분리된 개발용 사본)
 └── crazyflie-firmware/            # git submodule
 ```
 
@@ -30,6 +30,8 @@ crazyflie/
 git clone --recursive <이 저장소 URL> crazyflie
 cd crazyflie
 ```
+`--recursive`는 `crazyflie-firmware`(submodule)를 같이 받기 위한 옵션이다. `cf_ws/src/crazyflie-basic`은 일반 파일이라 별도 submodule 초기화 없이 그냥 딸려온다.
+
 이미 로컬에 폴더가 있다면 이 단계는 건너뛰세요.
 
 ### 1. UID/GID 설정 (최초 1회)
