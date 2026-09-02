@@ -7,6 +7,14 @@
 | `firmware` | `crazyflie-firmware` 빌드/플래시, `cfclient` GUI | `ubuntu:24.04` + pixi |
 | `basic` | ROS 2 Jazzy 기반 crazyswarm2 비행 예제 (`crazyflie-basic`) | `osrf/ros:jazzy-desktop` |
 
+## 편의 스크립트
+
+`docker/` 아래 스크립트로 자주 쓰는 `docker compose` 명령을 대신할 수 있다 (내부적으로 `compose.yml`을 그대로 쓴다):
+
+- `./docker/crazyflie.sh` — `.env` 생성 + `xhost` 허용 + `up -d --build`
+- `./docker/cf_basic.sh` — `docker compose exec basic bash`
+- `./docker/cfclient.sh` — `docker compose exec firmware cfclient`
+
 ## GPU 없는 팀원 vs 있는 팀원
 
 GPU가 없어도 두 서비스 모두 완전히 동작한다 (지금 당장은 어느 쪽도 GPU 연산을 쓰지 않음). GPU는 향후 인지/VLN 모듈 연동을 위해 미리 배선만 해둔 상태다.
@@ -90,7 +98,7 @@ docker compose -f docker/compose.yml exec basic bash -c "source install/setup.ba
 
 ```bash
 docker compose -f docker/compose.yml exec firmware bash
-pixi run cfclient
+cfclient
 ```
 
 ## 실제 드론(하드웨어) 사용
@@ -100,7 +108,7 @@ pixi run cfclient
 3. firmware 컨테이너에서 cfclient 실행:
    ```bash
    docker compose -f docker/compose.yml exec firmware bash
-   pixi run cfclient
+   cfclient
    ```
    cfclient GUI에서 "Scan"으로 Crazyradio 인식 및 드론 주소(`radio://0/80/2M/E7E7E7E7E7` 등)를 확인하고 연결한다.
 4. 새로 빌드한 펌웨어를 실제 드론에 플래시하려면 cfclient의 Bootloader 탭(또는 CLI `cfloader`)을 사용한다. `crazyflie-firmware`는 `pixi run make`로 빌드하면 `build/` 아래 `.bin`이 생성된다 (호스트의 `crazyflie-firmware/build/`는 `.gitignore` 처리되어 있음).
@@ -118,6 +126,8 @@ docker compose -f docker/compose.yml -f docker/compose.gpu.yml exec firmware nvi
 
 - `cflib`, `transforms3d`, `rowan`, `matplotlib`은 crazyswarm2(`crazyflie_server_py`/`crazyflie_py`/`crazyflie_sim`)가 실제로 import하지만, `<depend>`가 apt로 안 풀리거나(`transforms3d`) 아예 선언 자체가 없어서(`cflib`, `rowan`, `matplotlib`) colcon 빌드로는 설치되지 않는다. `docker/basic/requirements.txt`에 명시적으로 pin 해뒀다 — 지우지 말 것.
 - `backend:=sim`은 `cffirmware`(firmware의 control/estimator 코드를 SWIG로 감싼 Python 바인딩)가 필요하다. PyPI에 없어서 `crazyflie-firmware` 소스로부터 직접 빌드해야 하는데, `basic` 컨테이너에도 `crazyflie-firmware`를 마운트해두고 `entrypoint.sh`가 최초 접속 시 `make bindings_python`으로 자동 빌드한다. `firmware`/`basic` 두 컨테이너가 이 빌드 산출물(`crazyflie-firmware/build/`)을 공유하는데 Python 버전이 서로 다르므로(`firmware`는 pixi의 Python, `basic`은 3.12), `entrypoint.sh`는 파일 존재 여부가 아니라 실제 `import cffirmware`가 되는지로 재빌드 여부를 판단한다.
+- `cfclient`(및 다른 pixi pypi-dependencies)는 `crazyflie-firmware/.pixi/envs/default/bin`에 설치된다. 이 프로젝트 로컬 pixi 환경 경로를 `docker/firmware/Dockerfile`의 이미지 `ENV PATH`에 직접 넣어뒀으므로, `pixi run cfclient` 대신 `docker compose exec firmware cfclient`(=`cfclient.sh`)처럼 셸 없이 바로 실행해도 된다.
+- PyQt6(cfclient GUI)가 필요로 하는 `libegl1`, `libfontconfig1`, `libfreetype6`, `libdbus-1-3`, `libpcsclite1`, `libpulse0`은 `ubuntu:24.04` 베이스에 기본으로 없어서 `ImportError: libEGL.so.1 ...` 식으로 실행 시점에야 실패가 드러난다. `docker/firmware/Dockerfile`에 명시적으로 설치해뒀다.
 - 호스트의 `cf_ws/build|install|log|cache`는 예전에 ROS 2 Humble로 빌드된 산출물로, 이 Docker 환경에서는 전혀 사용하지 않는다 (컨테이너는 named volume에 자체 빌드 산출물을 갖는다). 안전하게 `rm -rf cf_ws/build cf_ws/install cf_ws/log cf_ws/cache`로 지워도 된다.
 - `pixi.toml`/`package.xml` 등 의존성 정의가 바뀌면 이미지를 다시 빌드해야 한다: `docker compose -f docker/compose.yml build --no-cache <서비스명>`.
 - colcon 빌드 산출물을 완전히 초기화하려면 `docker compose -f docker/compose.yml down -v` (named volume까지 삭제).

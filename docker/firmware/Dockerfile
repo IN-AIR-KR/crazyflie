@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 libxkbcommon-x11-0 libxcb-cursor0 \
     libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
     libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
+    libegl1 libfontconfig1 libfreetype6 libdbus-1-3 libpcsclite1 libpulse0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Ubuntu 24.04 base images ship a default "ubuntu" user/group at UID/GID 1000, which
@@ -41,6 +42,12 @@ WORKDIR /home/dev
 # pixi drives the STM32 cross-toolchain (xpack-gcc-arm-none-eabi) and cfclient per crazyflie-firmware/pixi.toml
 RUN curl -fsSL https://pixi.sh/install.sh | bash
 ENV PATH="/home/dev/.pixi/bin:$PATH"
+
+# The above PATH covers the `pixi` launcher itself; cfclient and friends live in the
+# *project-local* env pixi installs per pixi.toml, which `pixi run <cmd>` activates
+# on the fly. Putting it in PATH directly (an image ENV, not just .bashrc) means a
+# plain `cfclient` works both interactively and via `docker compose exec firmware cfclient`.
+ENV PATH="/workspace/crazyflie-firmware/.pixi/envs/default/bin:$PATH"
 
 COPY --chown=dev:dev docker/firmware/entrypoint.sh /home/dev/entrypoint.sh
 USER root
