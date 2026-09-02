@@ -46,6 +46,12 @@ RUN pip install --break-system-packages --ignore-installed -r /tmp/requirements.
 COPY docker/basic/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# entrypoint.sh sources ROS/the workspace overlay only for its own PID-1 shell —
+# `docker compose exec basic bash` starts a brand-new shell that never sees that,
+# so `ros2`/colcon's ament_cmake lookup fail there unless we also source on login.
+RUN echo 'source /opt/ros/jazzy/setup.bash' >> /home/dev/.bashrc \
+    && echo 'if [ -f /workspace/cf_ws/install/setup.bash ]; then source /workspace/cf_ws/install/setup.bash; fi' >> /home/dev/.bashrc
+
 USER dev
 WORKDIR /workspace/cf_ws
 
