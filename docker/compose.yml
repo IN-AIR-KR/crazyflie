@@ -1,0 +1,57 @@
+services:
+  firmware:
+    build:
+      context: ..
+      dockerfile: docker/firmware/Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: cf_firmware
+    privileged: true
+    network_mode: host
+    environment:
+      - DISPLAY
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+    volumes:
+      - ../crazyflie-firmware:/workspace/crazyflie-firmware
+      - firmware_pixi_cache:/workspace/crazyflie-firmware/.pixi
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev/bus/usb:/dev/bus/usb
+      - /etc/localtime:/etc/localtime:ro
+    working_dir: /workspace/crazyflie-firmware
+    stdin_open: true
+    tty: true
+
+  basic:
+    build:
+      context: ..
+      dockerfile: docker/basic/Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: cf_basic
+    privileged: true
+    network_mode: host
+    environment:
+      - DISPLAY
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+      - ROS_DOMAIN_ID=0
+    volumes:
+      - ../cf_ws/src:/workspace/cf_ws/src
+      - cf_ws_build:/workspace/cf_ws/build
+      - cf_ws_install:/workspace/cf_ws/install
+      - cf_ws_log:/workspace/cf_ws/log
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev/bus/usb:/dev/bus/usb
+      - /etc/localtime:/etc/localtime:ro
+    working_dir: /workspace/cf_ws
+    stdin_open: true
+    tty: true
+
+volumes:
+  firmware_pixi_cache:
+  cf_ws_build:
+  cf_ws_install:
+  cf_ws_log:

@@ -1,0 +1,20 @@
+# colcon workspace artifacts (rebuilt fresh inside containers via named volumes)
+cf_ws/build/
+cf_ws/install/
+cf_ws/log/
+cf_ws/cache/
+
+# firmware build + pixi env
+crazyflie-firmware/build/
+crazyflie-firmware/.pixi/
+
+# python
+__pycache__/
+*.pyc
+
+# env / secrets
+.env
+docker/.env
+
+# X11 auth helper generated on the host
+.docker.xauth

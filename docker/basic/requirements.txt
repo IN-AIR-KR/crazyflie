@@ -1,0 +1,4 @@
+# cflib is used by crazyswarm2's crazyflie_server_py (CRTP/Crazyradio comms) and
+# crazyflie/scripts/flash.py, but upstream doesn't declare it in any package.xml or
+# requirements.txt. Tracked here so it isn't accidentally dropped as "unused".
+cflib>=0.1.25
