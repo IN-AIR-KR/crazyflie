@@ -49,13 +49,15 @@ xhost +local:docker
 
 더 강한 격리가 필요하면, 호스트에 표준 Bitcraze `99-bitcraze.rules`를 설치하고 `plugdev` 그룹에 사용자를 추가한 뒤, compose에서 `privileged: true`를 제거하고 `devices:`로 정확한 `/dev/bus/usb/<bus>/<device>` 경로만 지정하는 방식으로 바꿀 수 있다.
 
+> **Bitcraze 공식 [USB permissions](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/installation/usb_permissions/) 가이드(udev 규칙 설치)는 여기서 안 따라도 된다.** 그 가이드는 cfclient를 호스트에 네이티브로 설치했을 때를 위한 것이고, 이 저장소는 위에서 설명한 `privileged` + `fix-usb-perms` 방식으로 이미 같은 문제를 해결해뒀다.
+
 **주의**: `privileged: true`는 커널 device cgroup 제약만 풀어줄 뿐, `/dev/bus/usb/*` 장치 파일 자체의 유닉스 권한(대개 `root:root`, 660)까지 바꿔주지는 않는다. 그래서 두 이미지 모두 entrypoint에서 컨테이너 시작 시 `fix-usb-perms`(`sudo chmod -R o+rw /dev/bus/usb`)를 자동 실행해 non-root `dev` 유저도 Crazyradio/Crazyflie USB에 접근할 수 있게 해뒀다. **컨테이너가 이미 떠 있는 상태에서 Crazyradio를 새로 꽂았다면** (최초 chmod 시점을 놓치므로) 컨테이너 안에서 다시 실행:
 
 ```bash
 fix-usb-perms
 ```
 
-연결 확인:
+연결 확인 (호스트에서 — 컨테이너 안에는 `lsusb`가 없다):
 
 ```bash
 lsusb | grep -i "1915:7777\|Bitcraze"   # Crazyradio PA
