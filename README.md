@@ -62,7 +62,7 @@ docker compose version
 ### 0. 저장소 받기 (컴퓨터 한 대당 최초 1회만)
 
 ```bash
-git clone --recursive <이 저장소 URL> crazyflie
+git clone --recursive https://github.com/IN-AIR-KR/crazyflie.git crazyflie
 cd crazyflie
 ```
 
@@ -90,17 +90,15 @@ rviz2, cfclient처럼 창이 뜨는 프로그램을 컨테이너 안에서 실�
 ### 3. 환경 만들고 켜기
 
 ```bash
-docker compose -f docker/compose.yml build
-docker compose -f docker/compose.yml up -d
+docker compose -f docker/compose.yml up -d --build
 ```
 
-첫 번째 줄(`build`)은 필요한 프로그램들을 전부 설치한 "이미지"를 만드는 과정이라 처음 한 번은 시간이 꽤 걸립니다 (인터넷에서 여러 파일을 받아옵니다). 두 번째 줄(`up -d`)은 그 이미지로 컨테이너 2개(`firmware`, `basic`)를 백그라운드로 실행합니다. `-d`는 "터미널을 계속 붙잡지 않고 뒤에서 켜둔다"는 뜻입니다.
+`--build`는 필요한 프로그램들을 전부 설치한 "이미지"를 먼저 만들고 나서 컨테이너를 켜라는 뜻입니다. 이미지를 새로 만드는 과정이라 처음 한 번은 시간이 꽤 걸립니다 (인터넷에서 여러 파일을 받아옵니다). 이미 만들어둔 이미지가 있고 코드/설정도 안 바뀌었다면 `--build` 없이 `docker compose -f docker/compose.yml up -d`만 실행해도 됩니다. `-d`는 "터미널을 계속 붙잡지 않고 뒤에서 켜둔다"는 뜻입니다.
 
-GPU가 있는 컴퓨터라면 (선택사항, `nvidia-container-toolkit` 설치 필요) 위 두 줄 대신 이렇게 씁니다:
+GPU가 있는 컴퓨터라면 (선택사항, `nvidia-container-toolkit` 설치 필요) 위 줄 대신 이렇게 씁니다:
 
 ```bash
-docker compose -f docker/compose.yml -f docker/compose.gpu.yml build
-docker compose -f docker/compose.yml -f docker/compose.gpu.yml up -d
+docker compose -f docker/compose.yml -f docker/compose.gpu.yml up -d --build
 ```
 
 > 매번 `-f docker/compose.yml`을 치기 귀찮으면 `cd docker`로 들어가서 `-f compose.yml` 부분을 생략하고 써도 됩니다. 이 문서는 저장소 루트 기준으로 통일해서 적었습니다.
@@ -154,7 +152,7 @@ pixi run cfclient
 docker compose -f docker/compose.yml down
 ```
 
-켜져 있던 컨테이너 2개를 끄고 정리합니다. 다음에 다시 쓸 때는 3번 단계(`up -d`)부터 시작하면 됩니다 (`build`는 코드/설정이 바뀌지 않았다면 다시 안 해도 됩니다).
+켜져 있던 컨테이너 2개를 끄고 정리합니다. 다음에 다시 쓸 때는 3번 단계로 돌아가면 되는데, 코드/설정이 안 바뀌었다면 `--build` 없이 `docker compose -f docker/compose.yml up -d`만 실행해도 됩니다 (이미지를 다시 만들 필요가 없어서 훨씬 빠릅니다).
 
 ## 자주 발생하는 문제
 
@@ -171,7 +169,7 @@ sudo usermod -aG docker $USER
 ```
 
 **컨테이너 안에서 만든 파일이 호스트에서 `root` 소유로 보임**
-[1단계](#1-내-계정-정보-설정-최초-1회)를 안 하고 `build`/`up`을 먼저 했을 가능성이 큽니다. `docker/.env` 파일을 만든 뒤 `docker compose -f docker/compose.yml build`로 다시 빌드하세요.
+[1단계](#1-내-계정-정보-설정-최초-1회)를 안 하고 먼저 켰을 가능성이 큽니다. `docker/.env` 파일을 만든 뒤 `docker compose -f docker/compose.yml up -d --build`로 다시 빌드하세요.
 
 **rviz2/cfclient 창이 안 뜨고 에러가 남 (X11 관련)**
 [2단계](#2-화면gui-띄우기-허용-터미널을-새로-열거나-컴퓨터를-재시작할-때마다-1회)의 `xhost +local:docker`를 안 했거나, 재부팅 후 다시 안 한 경우입니다.
