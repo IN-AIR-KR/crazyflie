@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential git curl sudo \
     python3-pip python3-colcon-common-extensions python3-rosdep \
     libusb-1.0-0-dev \
+    swig \
     && rm -rf /var/lib/apt/lists/*
 
 RUN rosdep init || true && rosdep update
@@ -49,8 +50,11 @@ RUN chmod +x /entrypoint.sh
 # entrypoint.sh sources ROS/the workspace overlay only for its own PID-1 shell —
 # `docker compose exec basic bash` starts a brand-new shell that never sees that,
 # so `ros2`/colcon's ament_cmake lookup fail there unless we also source on login.
+# PYTHONPATH here is for crazyflie_sim's `backend:=sim` (SIL), which imports
+# `cffirmware` — built by entrypoint.sh from the crazyflie-firmware bind mount.
 RUN echo 'source /opt/ros/jazzy/setup.bash' >> /home/dev/.bashrc \
-    && echo 'if [ -f /workspace/cf_ws/install/setup.bash ]; then source /workspace/cf_ws/install/setup.bash; fi' >> /home/dev/.bashrc
+    && echo 'if [ -f /workspace/cf_ws/install/setup.bash ]; then source /workspace/cf_ws/install/setup.bash; fi' >> /home/dev/.bashrc \
+    && echo 'export PYTHONPATH="/workspace/crazyflie-firmware/build:$PYTHONPATH"' >> /home/dev/.bashrc
 
 USER dev
 WORKDIR /workspace/cf_ws

@@ -2,3 +2,22 @@
 # crazyflie/scripts/flash.py, but upstream doesn't declare it in any package.xml or
 # requirements.txt. Tracked here so it isn't accidentally dropped as "unused".
 cflib>=0.1.25
+
+# crazyflie_py and crazyflie_sim (crazyswarm2) both declare
+# <depend>python3-transforms3d</depend> in package.xml, but Ubuntu 24.04 (noble)
+# has no `python3-transforms3d` apt package — rosdep install fails to resolve it
+# ("Unable to locate package") and colcon's ament_python build doesn't pip-install
+# a package's own install_requires either, so crazyflie_sim's simulated server
+# crashes at runtime with "ModuleNotFoundError: No module named 'transforms3d'"
+# unless it's installed here directly.
+transforms3d
+
+# crazyflie_sim's default (backend:=sim) numpy backend (backend/np.py) imports
+# `rowan` for quaternion math. Same story as transforms3d above: not declared as
+# a system rosdep, not pip-installed by colcon, so the crazyflie_server crashes
+# with "ModuleNotFoundError: No module named 'rowan'" without it.
+rowan
+
+# crazyflie_sim's trajectory/visualization helpers (visualization/pdf.py) import
+# matplotlib; cheap to include so those paths don't hit the same class of error.
+matplotlib

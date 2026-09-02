@@ -43,6 +43,9 @@ services:
       - cf_ws_build:/workspace/cf_ws/build
       - cf_ws_install:/workspace/cf_ws/install
       - cf_ws_log:/workspace/cf_ws/log
+      # crazyswarm2's backend:=sim needs the cffirmware Python bindings, built from
+      # this source (see entrypoint.sh) — same host checkout the firmware service uses.
+      - ../crazyflie-firmware:/workspace/crazyflie-firmware
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev/bus/usb:/dev/bus/usb
       - /etc/localtime:/etc/localtime:ro
