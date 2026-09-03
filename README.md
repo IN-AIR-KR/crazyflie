@@ -33,11 +33,16 @@ docker compose -f docker/compose.yml -f docker/compose.gpu.yml build
 docker compose -f docker/compose.yml -f docker/compose.gpu.yml up -d
 ```
 
-**시뮬레이션 확인** (`cf_basic.sh`로 접속한 뒤):
+**시뮬레이션 확인** (`cf_basic.sh`로 접속한 뒤, 최초 1회 빌드):
 ```bash
 colcon build --symlink-install
-source install/setup.bash
-ros2 launch crazyflie_test launch.py mode:=opticalflow backend:=sim
+```
+
+빌드 후엔 컨테이너 밖에서 `launch.sh`로 바로 실행 + rviz2 시각화까지 한 번에 (rviz2 창을 닫으면 같이 종료됨):
+```bash
+./docker/launch.sh                    # launch.py 기본값
+./docker/launch.sh backend:=sim       # 시뮬레이션
+./docker/launch.sh mode:=mocap backend:=cflib   # 실제 드론
 ```
 
 **실제 드론 사용**:

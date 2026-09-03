@@ -15,6 +15,7 @@
 - `./docker/container_start.sh` — `xhost` 허용 + `docker compose up -d`
 - `./docker/cf_basic.sh` — `docker compose exec basic bash`
 - `./docker/cfclient.sh` — `docker compose exec firmware cfclient`
+- `./docker/launch.sh [ros2 launch 인자...]` — `crazyflie_test`를 실행하고 rviz2를 `crazyflie_test/config/crazyflie.rviz` 설정으로 띄운다. rviz2를 닫으면 launch도 같이 종료된다. 예: `./docker/launch.sh backend:=sim`
 
 ## GPU 없는 팀원 vs 있는 팀원
 
