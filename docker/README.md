@@ -11,7 +11,8 @@
 
 `docker/` 아래 스크립트로 자주 쓰는 `docker compose` 명령을 대신할 수 있다 (내부적으로 `compose.yml`을 그대로 쓴다):
 
-- `./docker/crazyflie.sh` — `.env` 생성 + `xhost` 허용 + `up -d --build`
+- `./docker/build.sh` — `.env` 생성 + `docker compose build`
+- `./docker/container_start.sh` — `xhost` 허용 + `docker compose up -d`
 - `./docker/cf_basic.sh` — `docker compose exec basic bash`
 - `./docker/cfclient.sh` — `docker compose exec firmware cfclient`
 

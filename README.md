@@ -5,7 +5,7 @@ Crazyflie 드론 개발 통합 저장소. Docker로 개발 환경을 통일한�
 ## 구성
 
 - [`crazyflie-firmware/`](crazyflie-firmware/) — 드론 펌웨어. [bitcraze/crazyflie-firmware](https://github.com/bitcraze/crazyflie-firmware) git submodule.
-- [`cf_ws/src/crazyflie-basic/`](cf_ws/src/crazyflie-basic/) — 드론 제어용 ROS 2 패키지 (crazyswarm2 기반). [IN-AIR-KR/crazyflie-basic](https://github.com/IN-AIR-KR/crazyflie-basic) git submodule. `master`를 직접 건드리지 않도록 로컬 작업은 `dev/<이름>` 브랜치에서 한다.
+- [`cf_ws/src/crazyflie-basic/`](cf_ws/src/crazyflie-basic/) — 드론 제어용 ROS 2 패키지 (crazyswarm2 기반). [IN-AIR-KR/crazyflie-basic](https://github.com/IN-AIR-KR/crazyflie-basic) git submodule (`master` 추적).
 - [`docker/`](docker/) — 실행 환경 + 편의 스크립트.
 
 ## 사전 준비
@@ -21,14 +21,16 @@ Crazyflie 드론 개발 통합 저장소. Docker로 개발 환경을 통일한�
 git clone --recursive https://github.com/IN-AIR-KR/crazyflie.git crazyflie   # 최초 1회
 cd crazyflie
 
-./docker/crazyflie.sh      # 컨테이너 켜기 (최초엔 이미지 빌드까지 같이 함)
+./docker/build.sh          # 이미지 빌드
+./docker/container_start.sh  # 컨테이너 켜기
 ./docker/cf_basic.sh       # basic 컨테이너 접속
 ./docker/cfclient.sh       # cfclient(드론 GUI) 실행
 ```
 
-GPU 쓰는 경우 `./docker/crazyflie.sh` 대신:
+GPU 쓰는 경우 `build.sh`/`container_start.sh` 대신:
 ```bash
-docker compose -f docker/compose.yml -f docker/compose.gpu.yml up -d --build
+docker compose -f docker/compose.yml -f docker/compose.gpu.yml build
+docker compose -f docker/compose.yml -f docker/compose.gpu.yml up -d
 ```
 
 **시뮬레이션 확인** (`cf_basic.sh`로 접속한 뒤):
