@@ -32,10 +32,18 @@ services:
         GID: ${GID:-1000}
     container_name: cf_basic
     privileged: true
+    # Gazebo GUI hardware acceleration (/dev/dri/card* and renderD*).
+    # Override RENDER_GID in .env if the host render group uses another GID.
+    group_add:
+      - video
+      - "${RENDER_GID:-110}"
     network_mode: host
     environment:
       - DISPLAY
       - QT_X11_NO_MITSHM=1
+      # Mesa software rendering is the portable default; set to 0 in .env when
+      # using docker/compose.gpu.yml with a working host GPU driver.
+      - LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-1}
       - XAUTHORITY=/tmp/.docker.xauth
       - ROS_DOMAIN_ID=0
     volumes:

@@ -15,7 +15,33 @@
 - `./docker/container_start.sh` — `xhost` 허용 + `docker compose up -d`
 - `./docker/cf_basic.sh` — `docker compose exec basic bash`
 - `./docker/cfclient.sh` — `docker compose exec firmware cfclient`
-- `./docker/launch.sh [ros2 launch 인자...]` — `crazyflie_test`를 실행하고 rviz2를 `crazyflie_test/config/crazyflie.rviz` 설정으로 띄운다. rviz2를 닫으면 launch도 같이 종료된다. 예: `./docker/launch.sh backend:=sim`
+- `./docker/launch.sh [ros2 launch 인자...]` — `crazyflie_test`와 RViz2를 실행한다. `backend:=sim`이면 Gazebo Sim도 자동 실행하며, RViz2를 닫으면 launch와 Gazebo가 같이 종료된다. 예: `./docker/launch.sh backend:=sim`
+
+## Gazebo Sim 시각화
+
+ROS 2 Jazzy의 공식 Gazebo 조합인 **Gazebo Sim**을 사용한다. 이는 기존 회색 UI의 Gazebo Classic(Gazebo 11)이 아니라 그 후속 제품이므로 UI, launch 및 플러그인 체계가 다르다.
+
+```bash
+# 컨테이너 밖에서 실행
+./docker/launch.sh backend:=sim
+
+# Gazebo 창을 생략하고 기존처럼 SIL + RViz2만 실행
+./docker/launch.sh backend:=sim gazebo:=False
+```
+
+동작 구조는 다음과 같다.
+
+1. Crazyswarm2의 `backend:=sim`이 firmware SIL과 드론 동역학을 계산한다.
+2. `crazyflies_<mode>.yaml`에서 `enabled: true`인 드론 모델을 Gazebo에 생성한다.
+3. `gazebo_pose_bridge`가 SIL의 `world -> <드론 이름>` TF를 Gazebo 모델 pose에 30 Hz로 반영한다.
+
+Gazebo는 현재 **3D 시각화 역할만 수행**한다. Gazebo의 물리 엔진이 모터, 충돌 또는 공기역학을 계산하는 구성은 아니다. 단일 드론 `mode:=opticalflow backend:=sim`에서 RViz2와 Gazebo Sim의 모델 생성 및 pose 연동을 확인했다.
+
+Gazebo GUI는 호스트 GPU 드라이버 차이를 피하기 위해 기본적으로 Mesa 소프트웨어 렌더링을 사용한다. GPU 구성을 사용할 때는 `docker/.env`에서 `LIBGL_ALWAYS_SOFTWARE=0`으로 바꿀 수 있다. `/dev/dri/renderD*`의 그룹 GID가 110이 아닌 호스트에서는 다음처럼 설정한다:
+
+```bash
+echo "RENDER_GID=$(stat -c %g /dev/dri/renderD128)" >> docker/.env
+```
 
 ## GPU 없는 팀원 vs 있는 팀원
 
@@ -92,7 +118,7 @@ source install/setup.bash
 ros2 launch crazyflie_test launch.py mode:=opticalflow backend:=sim
 ```
 
-다른 터미널에서:
+위 명령은 Gazebo Sim도 함께 실행한다. Gazebo를 제외하려면 `gazebo:=False`를 추가한다. RViz2를 별도로 실행하려면 다른 터미널에서:
 
 ```bash
 docker compose -f docker/compose.yml exec basic bash -c "source install/setup.bash && rviz2"

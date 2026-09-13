@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential git curl sudo \
     python3-pip python3-colcon-common-extensions python3-rosdep \
+    ros-jazzy-ros-gz \
     libusb-1.0-0-dev \
     swig \
     && rm -rf /var/lib/apt/lists/*

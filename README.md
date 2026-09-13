@@ -38,12 +38,17 @@ docker compose -f docker/compose.yml -f docker/compose.gpu.yml up -d
 colcon build --symlink-install
 ```
 
-빌드 후엔 컨테이너 밖에서 `launch.sh`로 바로 실행 + rviz2 시각화까지 한 번에 (rviz2 창을 닫으면 같이 종료됨):
+빌드 후에는 컨테이너 밖에서 `launch.sh`로 바로 실행할 수 있다. `backend:=sim`이면 RViz2와 Gazebo Sim이 함께 열리고, RViz2 창을 닫으면 launch와 Gazebo도 같이 종료된다:
 ```bash
 ./docker/launch.sh                    # launch.py 기본값
-./docker/launch.sh backend:=sim       # 시뮬레이션
+./docker/launch.sh backend:=sim       # SIL + RViz2 + Gazebo Sim
+./docker/launch.sh backend:=sim gazebo:=False  # Gazebo 없이 SIL + RViz2
 ./docker/launch.sh mode:=mocap backend:=cflib   # 실제 드론
 ```
+
+Gazebo에는 `crazyflies_<mode>.yaml`에서 활성화된 드론이 생성되며, Crazyswarm2 SIL이 계산한 자세를 30 Hz로 반영한다. 따라서 현재 Gazebo 연동은 **비행 시각화 용도**이고, 충돌·모터·공기역학을 Gazebo가 계산하는 물리 시뮬레이션은 아니다.
+
+> 이 환경은 ROS 2 Jazzy와 공식 조합인 **Gazebo Sim**을 사용한다. 인터넷 자료에서 흔히 보이는 회색 UI의 **Gazebo Classic(Gazebo 11)**과는 다른 후속 제품이다. Gazebo Classic용 플러그인이나 world 파일은 그대로 사용할 수 없다.
 
 **실제 드론 사용**:
 1. Crazyradio를 꽂는다.
