@@ -16,6 +16,7 @@
 - `./docker/cf_basic.sh` — `docker compose exec basic bash`
 - `./docker/cfclient.sh` — `docker compose exec firmware cfclient`
 - `./docker/launch.sh [ros2 launch 인자...]` — `crazyflie_test`와 RViz2를 실행한다. `backend:=sim`이면 Gazebo Sim도 자동 실행하며, RViz2를 닫으면 launch와 Gazebo가 같이 종료된다. 예: `./docker/launch.sh backend:=sim`
+- `./docker/single_cf.sh [옵션...]` — 실행 중인 서버에 연결해 단일 기체 키보드 텔레옵을 소스에서 바로 시작한다. console entry point 재빌드는 필요 없다. 예: `./docker/single_cf.sh --height 0.5 --speed 0.3`
 
 ## Gazebo Sim 시각화
 
@@ -42,6 +43,28 @@ Gazebo GUI는 호스트 GPU 드라이버 차이를 피하기 위해 기본적으
 ```bash
 echo "RENDER_GID=$(stat -c %g /dev/dri/renderD128)" >> docker/.env
 ```
+
+## 단일 기체 키보드 텔레옵
+
+`single_cf.py`는 서버와 별도 프로세스로 실행한다. 새 console entry point가 install 공간에 반영되도록 최초 한 번 빌드한다:
+
+```bash
+docker compose -f docker/compose.yml exec basic bash -c \
+  "source /opt/ros/jazzy/setup.bash && source install/setup.bash && \
+   colcon build --symlink-install --packages-select crazyflie_test"
+```
+
+이후 호스트의 서로 다른 터미널에서 실행한다:
+
+```bash
+# 터미널 1
+./docker/launch.sh backend:=sim
+
+# 터미널 2 (TTY 필요)
+./docker/single_cf.sh
+```
+
+`single_cf.sh`는 현재 터미널의 TTY와 모든 CLI 옵션을 컨테이너의 `ros2 run crazyflie_test single_cf`에 전달한다. 파이프나 비대화형 `docker compose exec -T`에서는 키보드 입력을 받을 수 없다. 실기체에서는 서버를 `backend:=cpp`로 실행하고 비행 공간과 배터리를 확인한 뒤 사용한다.
 
 ## GPU 없는 팀원 vs 있는 팀원
 

@@ -50,6 +50,33 @@ Gazebo에는 `crazyflies_<mode>.yaml`에서 활성화된 드론이 생성되며,
 
 > 이 환경은 ROS 2 Jazzy와 공식 조합인 **Gazebo Sim**을 사용한다. 인터넷 자료에서 흔히 보이는 회색 UI의 **Gazebo Classic(Gazebo 11)**과는 다른 후속 제품이다. Gazebo Classic용 플러그인이나 world 파일은 그대로 사용할 수 없다.
 
+### 단일 기체 키보드 조종
+
+`single_cf.py`는 소스에서 직접 실행되므로 텔레옵 스크립트 사용에는 재빌드가 필요 없다. `ros2 run crazyflie_test single_cf` 명령도 사용하려면 최초 한 번 패키지를 다시 빌드한다:
+
+```bash
+docker compose -f docker/compose.yml exec basic bash -c \
+  "source /opt/ros/jazzy/setup.bash && source install/setup.bash && \
+   colcon build --symlink-install --packages-select crazyflie_test"
+```
+
+터미널 1에서 서버와 시각화를 실행하고, 터미널 2에서 키보드 조종기를 실행한다:
+
+```bash
+# 터미널 1: 시뮬레이션 + RViz2 + Gazebo Sim
+./docker/launch.sh backend:=sim
+
+# 터미널 2: 키보드 입력을 받는 단일 기체 조종기
+./docker/single_cf.sh
+```
+
+시뮬레이션에서는 자동으로 `setpoint` 모드가 선택된다. 주요 키는 `t` 이륙, `l` 착륙, `w/a/s/d` 수평 이동, `q/e` 회전, `r/f` 상승·하강, `h` 정지, `Esc` 안전 종료이며 `x`는 즉시 모터를 끄는 비상 정지다. 옵션은 그대로 전달할 수 있다:
+
+```bash
+./docker/single_cf.sh --height 0.5 --speed 0.3
+./docker/single_cf.sh --mode setpoint
+```
+
 **실제 드론 사용**:
 1. Crazyradio를 꽂는다.
 2. `./docker/cfclient.sh`에서 "Scan"으로 드론 연결 (필요하면 Bootloader 탭에서 펌웨어 플래시).
