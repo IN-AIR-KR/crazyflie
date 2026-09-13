@@ -13,6 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     swig \
     && rm -rf /var/lib/apt/lists/*
 
+# crazyflie_fms 의 웹 UI 는 브라우저에서 ROS 에 붙는다. rosbridge_server 가 그 websocket
+# 게이트웨이다. 프런트엔드는 빌드 단계가 없는 정적 HTML/JS(roslib 동봉)라 node/npm 은
+# 필요 없다 — 정적 파일은 crazyflie_fms 의 web_server 노드가 그대로 내려준다.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-jazzy-rosbridge-suite \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN rosdep init || true && rosdep update
 
 # Ubuntu 24.04 base images ship a default "ubuntu" user/group at UID/GID 1000, which
