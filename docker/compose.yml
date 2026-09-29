@@ -48,6 +48,11 @@ services:
       - ROS_DOMAIN_ID=0
     volumes:
       - ../cf_ws/src:/workspace/cf_ws/src
+      # Stage 0: 군집 MPC 정식화 검증 스크립트. ROS 를 쓰지 않는 순수 파이썬이라
+      # cf_ws/src 에 두지 않고 따로 마운트한다 (colcon 이 긁어가지 않게).
+      - ../stage0:/workspace/stage0
+      # Stage 1: TinyMPC 군집 스윕 커버리지 + SIL 노드 (sil/). 같은 이유로 따로 마운트한다.
+      - ../stage1:/workspace/stage1
       - cf_ws_build:/workspace/cf_ws/build
       - cf_ws_install:/workspace/cf_ws/install
       - cf_ws_log:/workspace/cf_ws/log

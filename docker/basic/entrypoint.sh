@@ -23,6 +23,14 @@ export PYTHONPATH="$FIRMWARE_DIR/build:$PYTHONPATH"
 if [ -f "$FIRMWARE_DIR/Makefile" ] && ! python3 -c "import cffirmware" 2>/dev/null; then
     echo "[entrypoint] Building cffirmware Python bindings for $(python3 --version) (needed for backend:=sim)..."
     rm -f "$FIRMWARE_DIR"/build/cffirmware.py "$FIRMWARE_DIR"/build/_cffirmware*.so "$FIRMWARE_DIR"/build/cffirmware_wrap.c
+    # The bindings compile firmware sources that include the Kconfig-generated
+    # build/include/generated/autoconf.h. If build/ was never configured (or was
+    # cleaned), bindings_python fails with "autoconf.h: No such file or directory" —
+    # generate the default cf2 config first, as Bitcraze's instructions do.
+    if [ ! -f "$FIRMWARE_DIR/build/include/generated/autoconf.h" ]; then
+        make -C "$FIRMWARE_DIR" cf2_defconfig \
+            || echo "[entrypoint] cf2_defconfig failed — the bindings build below will fail too."
+    fi
     make -C "$FIRMWARE_DIR" bindings_python \
         || echo "[entrypoint] cffirmware bindings build failed — backend:=sim won't work until this is fixed (backend:=cflib/cpp are unaffected)."
 fi

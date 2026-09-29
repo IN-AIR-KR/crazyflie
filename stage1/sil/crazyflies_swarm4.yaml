@@ -1,0 +1,53 @@
+# Stage 1 SIL — Crazyflie 4 대, backend:=sim 전용.
+# crazyswarm2 crazyflies.yaml 포맷(fileversion 3).
+#
+# initial_position 은 Python 시뮬레이션(scenario_sweep, seed 0)의 initial_states() 와 같다.
+# 이륙 순서를 일부러 섞어 두어 편대 형성 중 기체끼리 가로지르는 상황이 생긴다 —
+# Stage 1 에서 안전 필터가 필요했던 바로 그 상황을 SIL 에서도 재현하려는 것이다.
+# 슬롯 배정: 이름 순(cf1→0, cf2→1, …)으로 편대 오프셋 x = -0.9, -0.3, +0.3, +0.9 (+ 중심).
+#
+# ⚠️ 실기체용이 아니다. URI 는 sim 에서 쓰이지 않는 자리표시 값이다.
+fileversion: 3
+
+robots:
+  cf1:
+    enabled: true
+    uri: radio://0/80/2M/E7E7E7E701
+    initial_position: [1.45, -1.784, 0.0]
+    type: cf21_sim
+  cf2:
+    enabled: true
+    uri: radio://0/80/2M/E7E7E7E702
+    initial_position: [0.45, -1.793, 0.0]
+    type: cf21_sim
+  cf3:
+    enabled: true
+    uri: radio://0/80/2M/E7E7E7E703
+    initial_position: [0.95, -1.475, 0.0]
+    type: cf21_sim
+  cf4:
+    enabled: true
+    uri: radio://0/80/2M/E7E7E7E704
+    initial_position: [1.95, -1.435, 0.0]
+    type: cf21_sim
+
+robot_types:
+  cf21_sim:
+    motion_capture:
+      enabled: false
+      tracking: "vendor"
+    big_quad: false
+    battery:
+      voltage_warning: 3.8
+      voltage_critical: 3.7
+
+all:
+  reference_frame: "world"
+  firmware_params:
+    commander:
+      enHighLevel: 1
+    stabilizer:
+      estimator: 2
+      controller: 2    # Mellinger — cmdFullState 의 가속도 피드포워드를 쓴다
+  firmware_logging:
+    enabled: false

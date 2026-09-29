@@ -1,0 +1,7 @@
+# Stage 0 전용 의존성. 이 네 개 외에는 쓰지 않는다.
+# crazyflie 의 basic 이미지에는 numpy/matplotlib 이 이미 있고 osqp/scipy 가 없다 —
+# docker/basic/requirements.txt 에 osqp 와 scipy 를 더해 같은 컨테이너에서 돌린다.
+numpy
+scipy
+osqp
+matplotlib

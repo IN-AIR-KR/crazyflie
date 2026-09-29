@@ -1,0 +1,7 @@
+# Stage 1 의존성. 제어기·시뮬레이션은 numpy 만 쓰고, 나머지는 검증·그래프용이다.
+# basic 컨테이너에는 docker/basic/requirements.txt 로 전부 들어 있다.
+numpy
+matplotlib          # 그래프 (main.py --no-plot 이면 불필요)
+scipy               # tools/check_admm.py (osqp 가 csc 행렬을 받는다)
+osqp                # tools/check_admm.py, qi14 프로파일의 Stage 0 비교 기준선
+# tinympc           # tools/check_tinympc.py 에서만 — 공식 패키지 검증 재현용

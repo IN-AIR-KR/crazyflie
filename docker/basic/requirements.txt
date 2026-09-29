@@ -21,3 +21,14 @@ rowan
 # crazyflie_sim's trajectory/visualization helpers (visualization/pdf.py) import
 # matplotlib; cheap to include so those paths don't hit the same class of error.
 matplotlib
+
+# stage0/ 의 군집 MPC 정식화 검증 스크립트가 쓰는 QP 솔버. 충돌·장애물 회피를
+# 반공간 제약으로 옮긴 QP 를 매 제어주기 다시 푼다. Stage 0 비교 기준선이고,
+# stage1/ 에서는 TinyMPC 구현(tinyadmm.py)이 정확한 해를 내는지 검증하는 데 쓴다
+# (stage1/tools/check_admm.py). stage1 제어기 자체는 numpy 만 쓴다.
+osqp
+
+# osqp 가 문제를 csc_matrix 로 받으므로 scipy.sparse 가 필요하다. ROS Jazzy 의
+# desktop 메타패키지에 scipy 가 없어서 명시한다. numpy 2 헤더로 빌드된 wheel 은
+# apt 의 numpy 1.26 과도 런타임 호환되므로 ROS 쪽 numpy 를 건드리지 않는다.
+scipy

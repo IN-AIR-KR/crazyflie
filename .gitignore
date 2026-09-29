@@ -8,6 +8,12 @@ cf_ws/cache/
 crazyflie-firmware/build/
 crazyflie-firmware/.pixi/
 
+# stage0 실행 산출물 (그래프/지표는 매 실행마다 다시 생성된다)
+stage0/results/
+stage1/results/
+stage1/results_sil/
+stage1/sil/sil_log*.npz
+
 # python
 __pycache__/
 *.pyc
