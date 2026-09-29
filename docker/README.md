@@ -116,12 +116,15 @@ lsusb | grep -i "1915:7777\|Bitcraze"   # Crazyradio PA
 
 ## UID/GID (bind mount 파일 소유권)
 
-컨테이너 안에서 생성된 파일이 호스트에서 root 소유가 되지 않도록, 빌드 전에 `docker/.env`를 만든다:
+처음 사용하는 경우 예시 파일을 복사한 뒤, 호스트 계정의 UID/GID로 수정한다:
 
 ```bash
-echo "UID=$(id -u)" > docker/.env
-echo "GID=$(id -g)" >> docker/.env
+cp docker/.env.example docker/.env
+sed -i "s/^UID=.*/UID=$(id -u)/" docker/.env
+sed -i "s/^GID=.*/GID=$(id -g)/" docker/.env
 ```
+
+`docker/.env`는 호스트별 설정이므로 Git에 커밋하지 않는다. 팀에 공유할 기본값은 `docker/.env.example`에 반영한다. `./docker/build.sh`를 실행하면 `.env`가 없을 때 UID/GID 설정 파일을 자동으로 생성한다.
 
 ## 컨테이너 진입
 
