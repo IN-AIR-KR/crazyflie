@@ -44,8 +44,7 @@ colcon build --symlink-install
 ```bash
 ./docker/launch.sh                    # launch.py 기본값
 ./docker/launch.sh backend:=sim       # SIL + RViz2 + Gazebo Sim
-./docker/launch.sh backend:=sim gazebo:=False  # Gazebo 없이 SIL + RViz2
-./docker/launch.sh mode:=mocap backend:=cflib   # 실제 드론
+./docker/launch.sh mode:=opticalflow backend:=cpp   # 실제 드론
 ```
 
 Gazebo에는 `crazyflies_<mode>.yaml`에서 활성화된 드론이 생성되며, Crazyswarm2 SIL이 계산한 자세를 30 Hz로 반영한다. 따라서 현재 Gazebo 연동은 **비행 시각화 용도**이고, 충돌·모터·공기역학을 Gazebo가 계산하는 물리 시뮬레이션은 아니다.
@@ -69,14 +68,14 @@ docker compose -f docker/compose.yml exec basic bash -c \
 ./docker/launch.sh backend:=sim
 
 # 터미널 2: 키보드 입력을 받는 단일 기체 조종기
-./docker/single_cf.sh
+./docker/keyboard.sh
 ```
 
 시뮬레이션에서는 자동으로 `setpoint` 모드가 선택된다. 주요 키는 `t` 이륙, `l` 착륙, `w/a/s/d` 수평 이동, `q/e` 회전, `r/f` 상승·하강, `h` 정지, `Esc` 안전 종료이며 `x`는 즉시 모터를 끄는 비상 정지다. 옵션은 그대로 전달할 수 있다:
 
 ```bash
-./docker/single_cf.sh --height 0.5 --speed 0.3
-./docker/single_cf.sh --mode setpoint
+./docker/keyboard.sh --height 0.5 --speed 0.3
+./docker/keyboard.sh --mode setpoint
 ```
 
 **실제 드론 사용**:
