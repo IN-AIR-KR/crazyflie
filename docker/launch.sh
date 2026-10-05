@@ -15,7 +15,6 @@ docker compose -f compose.yml exec basic bash -c '
   set -e
   source /opt/ros/jazzy/setup.bash
   source install/setup.bash
-  export PYTHONPATH="/workspace/crazyflie-firmware/build:$PYTHONPATH"
   ros2 launch crazyflie_test launch.py "$@" &
   launch_pid=$!
   trap "kill $launch_pid 2>/dev/null" EXIT

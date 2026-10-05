@@ -1,4 +1,4 @@
-FROM osrf/ros:jazzy-desktop
+FROM osrf/ros:jazzy-desktop AS basic-base
 
 ARG UID=1000
 ARG GID=1000
@@ -45,17 +45,27 @@ COPY docker/basic/requirements.txt /tmp/requirements.txt
 # like PyYAML that ROS/rosdep already installed via dpkg without pip RECORD metadata.
 RUN pip install --break-system-packages --ignore-installed -r /tmp/requirements.txt
 
+# backend:=sim imports the firmware's SWIG bindings. Build them in a throwaway
+# stage so neither the source tree nor its build intermediates remain in the
+# runtime image.
+FROM basic-base AS cffirmware-builder
+COPY crazyflie-firmware /tmp/crazyflie-firmware
+RUN make -C /tmp/crazyflie-firmware cf2_defconfig \
+    && make -C /tmp/crazyflie-firmware bindings_python
+
+FROM basic-base AS basic-runtime
+COPY --from=cffirmware-builder /tmp/crazyflie-firmware/build/cffirmware.py \
+     /tmp/crazyflie-firmware/build/_cffirmware*.so /opt/cffirmware/
+ENV PYTHONPATH="/opt/cffirmware"
+
 COPY docker/basic/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # entrypoint.sh sources ROS/the workspace overlay only for its own PID-1 shell —
 # `docker compose exec basic bash` starts a brand-new shell that never sees that,
 # so `ros2`/colcon's ament_cmake lookup fail there unless we also source on login.
-# PYTHONPATH here is for crazyflie_sim's `backend:=sim` (SIL), which imports
-# `cffirmware` — built by entrypoint.sh from the crazyflie-firmware bind mount.
 RUN echo 'source /opt/ros/jazzy/setup.bash' >> /home/dev/.bashrc \
-    && echo 'if [ -f /workspace/cf_ws/install/setup.bash ]; then source /workspace/cf_ws/install/setup.bash; fi' >> /home/dev/.bashrc \
-    && echo 'export PYTHONPATH="/workspace/crazyflie-firmware/build:$PYTHONPATH"' >> /home/dev/.bashrc
+    && echo 'if [ -f /workspace/cf_ws/install/setup.bash ]; then source /workspace/cf_ws/install/setup.bash; fi' >> /home/dev/.bashrc
 
 USER dev
 WORKDIR /workspace/cf_ws
