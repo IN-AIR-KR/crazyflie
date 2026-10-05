@@ -5,8 +5,10 @@ Crazyflie 드론 개발 통합 저장소. Docker로 개발 환경을 통일한�
 ## 구성
 
 - [`crazyflie-firmware/`](crazyflie-firmware/) — 드론 펌웨어. [bitcraze/crazyflie-firmware](https://github.com/bitcraze/crazyflie-firmware) git submodule.
-- [`cf_ws/src/crazyflie-basic/`](cf_ws/src/crazyflie-basic/) — 드론 제어용 ROS 2 패키지 (crazyswarm2 기반). [IN-AIR-KR/crazyflie-basic](https://github.com/IN-AIR-KR/crazyflie-basic) git submodule (`master` 추적).
+- [`cf_ws/src/crazyflie-basic/`](cf_ws/src/crazyflie-basic/) — 드론 제어용 ROS 2 패키지 (crazyswarm2 기반). 내부 라이브러리까지 이 저장소가 일반 파일로 직접 관리한다.
 - [`docker/`](docker/) — 실행 환경 + 편의 스크립트.
+
+드론 제어 코드는 `crazyflie-basic` 원격 저장소와 별도로 동기화할 필요 없이 이 저장소에서 수정하고 커밋한다. 포함된 외부 소스의 원본과 기준 커밋은 [`UPSTREAM.md`](cf_ws/src/crazyflie-basic/UPSTREAM.md)에 기록되어 있다. `crazyflie-firmware`는 계속 서브모듈이므로 최초 클론에는 `--recursive`를 사용한다.
 
 ## 사전 준비
 

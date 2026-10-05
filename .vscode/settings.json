@@ -1,3 +1,7 @@
 {
-  "git.detectSubmodules": false
+  "git.detectSubmodules": false,
+  "git.autoRepositoryDetection": false,
+  "git.ignoredRepositories": [
+    "cf_ws/src/crazyflie-basic"
+  ]
 }
