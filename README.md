@@ -64,8 +64,10 @@ docker compose -f docker/compose.yml exec basic bash -c \
 터미널 1에서 서버와 시각화를 실행하고, 터미널 2에서 키보드 조종기를 실행한다:
 
 ```bash
-# 터미널 1: 시뮬레이션 + RViz2 + Gazebo Sim
+# 터미널 1: 시뮬레이션 + RViz2 + Gazebo Sim or 실제 드론
 ./docker/launch.sh backend:=sim
+./docker/launch.sh mode:=opticalflow backend:=cpp   
+
 
 # 터미널 2: 키보드 입력을 받는 단일 기체 조종기
 ./docker/keyboard.sh

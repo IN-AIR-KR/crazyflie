@@ -300,9 +300,15 @@ def reset_estimator(cf, th, settle=RESET_SETTLE):
     ⚠️ sim 백엔드에는 파라미터 서비스가 없으므로 실기체에서만 호출할 것.
     ⚠️ settle 동안 기체를 움직이면 안 된다.
     """
-    cf.setParam('kalman.resetEstimation', 1)
+    param = 'kalman.resetEstimation'
+    if param not in cf.paramTypeDict:
+        raise RuntimeError(
+            f'기체 펌웨어가 {param} 파라미터를 제공하지 않음 — '
+            '현재 저장소의 crazyflie-firmware를 플래시한 뒤 다시 시도할 것')
+
+    cf.setParam(param, 1)
     th.sleep(0.1)
-    cf.setParam('kalman.resetEstimation', 0)
+    cf.setParam(param, 0)
     th.sleep(settle)
 
 
@@ -411,7 +417,11 @@ class Teleop:
         # 표류가 그대로 원점이 되어 엉뚱한 자리를 기준으로 날아오른다.
         if self.real and self.args.reset:
             _say(f'추정기 리셋 — {RESET_SETTLE:.0f}초간 기체를 움직이지 말 것')
-            reset_estimator(self.cf, self.th)
+            try:
+                reset_estimator(self.cf, self.th)
+            except RuntimeError as exc:
+                _say(f'이륙 취소: {exc}')
+                return
         self.z = self.args.height
         _say(f'이륙 → {self.z:.2f} m')
         self.cf.takeoff(targetHeight=self.z, duration=TAKEOFF_DURATION)

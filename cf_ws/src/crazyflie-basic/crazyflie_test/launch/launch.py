@@ -111,6 +111,9 @@ def generate_launch_description():
             'motion_capture_yaml_file': motion_capture_yaml_file,
             'mocap': use_mocap,
             'backend': backend,
+            # This package has its own keyboard controller (keyboard.sh).
+            # Do not start Crazyswarm2's joystick teleop/joy_node implicitly.
+            'teleop': 'False',
         }.items(),
     )
 
