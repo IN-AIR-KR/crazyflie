@@ -21,3 +21,11 @@ rowan
 # crazyflie_sim's trajectory/visualization helpers (visualization/pdf.py) import
 # matplotlib; cheap to include so those paths don't hit the same class of error.
 matplotlib
+
+# 기체별 온라인 DMPC quadratic program solver.
+osqp>=1.0,<2
+
+# osqp가 setuptools를 요구해서 --ignore-installed로 최신 setuptools(80 이상)가 깔리면
+# colcon build --symlink-install이 "option --uninstall not recognized"로 실패한다.
+# colcon-core가 요구하는 범위로 고정한다.
+setuptools<80

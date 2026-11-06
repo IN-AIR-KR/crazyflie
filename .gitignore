@@ -21,3 +21,6 @@ docker/.env
 
 # Claude Code session state
 .claude/
+
+# pytest
+.pytest_cache/

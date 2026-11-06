@@ -16,9 +16,27 @@
 - `./docker/cf_basic.sh` — `docker compose exec basic bash`
 - `./docker/cfclient.sh` — `docker compose exec firmware cfclient`
 - `./docker/launch.sh [ros2 launch 인자...]` — `crazyflie_test`와 RViz2를 실행한다. `backend:=sim`이면 Gazebo Sim도 자동 실행하며, RViz2를 닫으면 launch와 Gazebo가 같이 종료된다. 예: `./docker/launch.sh backend:=sim`
+- `./docker/trajectory.sh preview` — 장애물 없는 공통 `world` 공간에서 2대 DMPC 예측 궤적을 RViz에 표시한다. 비행 실행기는 시작하지 않는다.
+- `./docker/trajectory.sh run` — 2대 교차 이동을 온라인 궤적 계획과 공통 full-state 실행기로 수행한다.
+- `./docker/trajectory.sh run trajectory_scenario:=crossing4` — 같은 구조로 4대 교차 이동을 수행한다. [구조와 설정](../cf_ws/src/crazyflie-basic/crazyflie_test/DELIVERY_DESIGN.md).
+- `./docker/delivery.sh preview` — Gazebo 4대와 배송 장면, RViz의 드론별 할당 경로를 표시한다.
+- `./docker/delivery.sh run` — 같은 4대 환경에서 박스 운반과 목적지 적재를 순차 실행한다. 이전 launch를 종료한 뒤 실행한다. 하드웨어 비행 명령은 아니다.
+- `./docker/delivery.sh preview delivery_strategy:=coordinated` — 기존 동시 배송 관제의 단계별 경로, 4초 예측, 6쌍 TTC를 확인한다.
+- `./docker/delivery.sh run delivery_strategy:=coordinated` — 4대 동시 배송과 구역 예약/충돌 예측을 실행한다. 기존 비교군은 `delivery_strategy:=baseline`이며 기본값이다. [새 관제 설명](../cf_ws/src/crazyflie-basic/crazyflie_test/COORDINATED_DELIVERY.md).
 - `./docker/single_cf.sh [옵션...]` — 실행 중인 서버에 연결해 단일 기체 키보드 텔레옵을 소스에서 바로 시작한다. console entry point 재빌드는 필요 없다. 예: `./docker/single_cf.sh --height 0.5 --speed 0.3`
 
 ## Gazebo Sim 시각화
+
+창이 비어 있으면 터미널의 launch 오류를 먼저 확인한다. `package 'ros_gz_sim' not found`는
+기존 컨테이너에 Gazebo가 설치되지 않은 경우다. 호스트의 저장소 루트에서 다음을 실행한다.
+빌드/설치 작업공간은 Docker 볼륨에 보존된다.
+
+```bash
+docker compose -f docker/compose.yml build basic
+docker compose -f docker/compose.yml up -d basic
+```
+
+`launch.sh`는 Gazebo 패키지를 확인한 뒤 실행하며, launch가 실패하면 RViz도 종료한다.
 
 ROS 2 Jazzy의 공식 Gazebo 조합인 **Gazebo Sim**을 사용한다. 이는 기존 회색 UI의 Gazebo Classic(Gazebo 11)이 아니라 그 후속 제품이므로 UI, launch 및 플러그인 체계가 다르다.
 
@@ -38,7 +56,14 @@ ROS 2 Jazzy의 공식 Gazebo 조합인 **Gazebo Sim**을 사용한다. 이는 �
 
 Gazebo는 현재 **3D 시각화 역할만 수행**한다. Gazebo의 물리 엔진이 모터, 충돌 또는 공기역학을 계산하는 구성은 아니다. 단일 드론 `mode:=opticalflow backend:=sim`에서 RViz2와 Gazebo Sim의 모델 생성 및 pose 연동을 확인했다.
 
-Gazebo GUI는 호스트 GPU 드라이버 차이를 피하기 위해 기본적으로 Mesa 소프트웨어 렌더링을 사용한다. GPU 구성을 사용할 때는 `docker/.env`에서 `LIBGL_ALWAYS_SOFTWARE=0`으로 바꿀 수 있다. `/dev/dri/renderD*`의 그룹 GID가 110이 아닌 호스트에서는 다음처럼 설정한다:
+Gazebo GUI는 호스트 GPU 드라이버 차이를 피하기 위해 기본적으로 Mesa 소프트웨어 렌더링을 사용한다. GPU 구성을 사용할 때는 `docker/.env`에서 `LIBGL_ALWAYS_SOFTWARE=0`으로 바꿀 수 있다.
+
+Gazebo GUI의 기본 렌더러는 `ogre`다. 소프트웨어 렌더링일 때 `launch.sh`는
+`LIBGL_DRI3_DISABLE=1`도 적용해 호스트/컨테이너 사이의 검은 화면 문제를 피한다.
+`gazebo_render_engine:=ogre2`로 렌더러를 바꿀 수 있다.
+관련 설정은 [Gazebo 공식 문제 해결 안내](https://gazebosim.org/docs/harmonic/troubleshooting/#unable-to-create-the-rendering-window)를 참고한다.
+
+`/dev/dri/renderD*`의 그룹 GID가 110이 아닌 호스트에서는 다음처럼 설정한다:
 
 ```bash
 echo "RENDER_GID=$(stat -c %g /dev/dri/renderD128)" >> docker/.env

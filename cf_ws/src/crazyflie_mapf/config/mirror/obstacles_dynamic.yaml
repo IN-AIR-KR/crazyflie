@@ -1,0 +1,14 @@
+# mirror 모드의 움직이는 가상 박스. 실물이 없으므로 시뮬레이션 기체만 이를 피하고,
+# 실기체는 그 회피 동작을 그대로 따라 한다. 좁은 공간에서는 교착이 생길 수 있어 기본값은 꺼져 있다.
+frame: world
+obstacles:
+  - name: moving_box
+    enabled: false
+    type: box
+    position: [0.0, -0.5, 0.5]
+    size: [0.3, 0.3, 1.0]
+    motion:
+      type: ping_pong
+      end_position: [0.0, 0.5, 0.5]
+      period: 10.0
+      start_time: 4.0
