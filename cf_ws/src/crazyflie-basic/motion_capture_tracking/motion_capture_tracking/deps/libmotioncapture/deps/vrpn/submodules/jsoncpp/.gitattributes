@@ -1,0 +1,3 @@
+# Preserve the original blobs: VRPN's attributes did not apply across the
+# former jsoncpp submodule boundary.
+* -text !eol
