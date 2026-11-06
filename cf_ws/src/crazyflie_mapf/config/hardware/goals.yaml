@@ -1,0 +1,10 @@
+# 실기체용 목적지 [x, y, z] (world, m). 반경 1.2m 원 위 5대가 반대편으로 교차한다.
+# robots.yaml에서 enabled: false인 기체의 목적지는 무시한다.
+# 높이는 planner.yaml의 takeoff_height와 bounds 안이어야 한다.
+frame: world
+goals:
+  cf1: [1.2, 0.0, 1.0]
+  cf2: [0.3708, 1.1413, 1.0]
+  cf3: [-0.9708, 0.7053, 1.0]
+  cf4: [-0.9708, -0.7053, 1.0]
+  cf5: [0.3708, -1.1413, 1.0]

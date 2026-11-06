@@ -1,0 +1,29 @@
+# 시뮬레이션 기체를 실기체가 그대로 따라 하는 설정 (mirror.launch.py).
+# 실기체 연결 정보: uri, 기체 유형, firmware 설정은 이 파일이 가리키는 hardware 설정을 그대로 쓴다.
+hardware_robots: ../hardware/robots.yaml
+motion_capture_file: ../hardware/motion_capture.yaml
+backend: cpp          # 실기체 서버: cpp 또는 cflib
+# Qualisys 사용 여부. false면 기체 자체 위치 추정(Flow/Lighthouse/Loco 덱 필요)으로 시뮬레이션 동작을 재현한다.
+# launch 인자 mocap:=true/false가 우선한다.
+mocap: true
+namespace: real       # 실기체 서버의 ROS 이름공간 (/real/cf3/...)
+
+# 실기체 좌표 = 시뮬레이션 좌표 + offset [m]. 실험실 원점이 다르면 x, y를 조정한다.
+offset: [0.0, 0.0, 0.0]
+# 실기체 지오펜스 (offset 적용 후, world 기준). 이 밖의 명령이 오면 그 기체만 착륙한다.
+bounds: [[-1.8, -1.8, 0.0], [1.8, 1.8, 2.0]]
+
+# 이륙 순간 실기체가 시뮬레이션 시작 위치(+offset)에서 이 거리 안에 있어야 한다. 아니면 그 기체는 띄우지 않는다.
+home_tolerance: 0.15
+# 위 거리 안에서 위치가 이 시간 이상 안정적이어야 이륙한다 [s]. 발산하는 추정값이 순간적으로 통과하는 것을 막는다.
+settle_time: 2.0
+# 실기체와 시뮬레이션 명령 위치의 차이가 이보다 크면 그 기체만 착륙한다 [m].
+max_tracking_error: 0.3
+# 명령 전송 시작 후 추종 오차 검사를 미루는 시간 [s] (이륙 직후 정착 시간).
+tracking_grace: 1.0
+# 실기체 위치가 이 시간 이상 안 들어오면 착륙 [s].
+pose_timeout: 0.3
+# 시뮬레이션 명령이 이 시간 이상 끊기면 착륙 [s].
+command_timeout: 0.3
+# 시뮬레이션 실행기 상태(/fleet/states)가 이 시간 이상 끊기면 착륙 [s].
+sim_timeout: 1.0

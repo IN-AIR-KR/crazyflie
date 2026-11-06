@@ -1,0 +1,11 @@
+# 실기체용 정적 장애물 (world 좌표, m). position은 박스 중심, size는 전체 너비/깊이/높이.
+# 실제 박스를 놓았다면 Qualisys로 위치를 측정해 넣는다. 실물이 없어도 비행 금지 구역으로 쓸 수 있다.
+# 계획기는 박스를 sqrt(3) * (size/2 + robot_radius + collision_margin) 반축의 타원체로 크게 우회한다.
+# 좁은 실험 공간에서는 경로가 없을 수 있으니 작은 박스부터 시험한다. 기본값은 꺼져 있다.
+frame: world
+obstacles:
+  - name: center_box
+    enabled: false
+    type: box
+    position: [0.0, 0.0, 0.5]
+    size: [0.3, 0.3, 1.0]

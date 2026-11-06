@@ -1,0 +1,38 @@
+# mirror 모드 계획 설정: 실기체가 시뮬레이션을 그대로 따라 하므로 hardware/planner.yaml과 같은 값을 쓴다.
+# 값을 바꾸면 두 파일을 함께 바꾼다. bounds는 실제 비행 공간 안이어야 한다.
+frame: world
+horizon: 4.0
+dt: 0.2
+plan_rate: 5.0
+# 실행기 명령 전송 주기. 7대 x 50Hz = 초당 350패킷. 동글 하나로 부족하면 동글을 늘린다.
+stream_rate: 50.0
+state_rate: 25.0
+# 속도·가속도: 시뮬레이션(2.5 / 0.65 / 0.9)보다 크게 낮춘 값
+speed: 0.5
+acceleration: 0.3
+deceleration: 0.4
+robot_radius: 0.18
+horizontal_separation: 0.52
+vertical_separation: 1.1
+# 기체 간 안전 타원체(수평 0.52m)가 이미 기체 크기(약 0.13m)보다 훨씬 크다.
+# 3.6m 공간에서 0.09 이상으로 키우면 일부 대수(2, 6, 7대)에서 서로 양보하지 못하고 멈췄다(교착).
+collision_margin: 0.06
+exchange_iterations: 8
+tracking_reset_distance: 0.2
+tracking_reset_velocity: 0.3
+state_timeout: 0.5
+# 실기체는 sim time이 없으므로 ROS 시간과 벽시계가 같다. 상태가 1초 끊기면 감속한다.
+wall_timeout: 1.0
+command_ttl: 0.4
+# 실험 공간 경계 [m]. 실제 비행 공간(그물/벽 안쪽)에 맞춰 줄인다.
+bounds: [[-1.8, -1.8, 0.2], [1.8, 1.8, 2.0]]
+arrival_radius: 0.12
+arrival_speed: 0.15
+takeoff_height: 1.0
+takeoff_duration: 3.0
+takeoff_timeout: 15.0
+land_height: 0.04
+land_duration: 3.0
+# 모든 목적지 도착 후 auto_land_delay초 호버한 뒤 전체 착륙한다. false면 호버를 유지한다.
+auto_land: true
+auto_land_delay: 2.0
