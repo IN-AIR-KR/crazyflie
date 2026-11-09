@@ -176,13 +176,13 @@ import json, sys
 d = json.loads(sys.stdin.readline())
 print(\"finished:\", d[\"finished\"], \" reached:\", d[\"reached\"], \"/\", len(d[\"robots\"]), \" mission_time:\", round(d[\"mission_time\"], 2))
 for name, goal in d[\"robots\"].items(): print(\" \", name, goal[\"status\"])
-' 2>/dev/null || echo '  (/fleet/status 없음: 실행 중이 아님)'
+' 2>/dev/null || { if pgrep -f '^/usr/bin/python3 /workspace/cf_ws/install/crazyflie_mapf/lib/crazyflie_mapf/fleet_manager' >/dev/null; then echo '  (시뮬레이션은 실행 중이지만 상태를 아직 못 받음: 시작 직후면 몇 초 뒤 다시 status)'; else echo '  (시뮬레이션 실행 중이 아님)'; fi; }
       echo '[mirror]' && timeout 5 ros2 topic echo --once --field data /mirror/status std_msgs/msg/String 2>/dev/null | python3 -c '
 import json, sys
 d = json.loads(sys.stdin.readline())
 print(\"  위치:\", \"Qualisys 모캡\" if d.get(\"mode\") != \"onboard\" else \"기체 자체 추정 (모캡 없음)\")
 for name, r in d[\"robots\"].items(): print(\" \", name, r[\"state\"], r[\"reason\"] or r[\"blocked\"] or (\"ready (start 가능)\" if r[\"state\"] == \"WAITING\" else \"\"))
-' 2>/dev/null || echo '  (mirror 노드 없음: real:=none으로 실행했거나, 실기체를 못 찾았거나, 실행 중이 아님)'"
+' 2>/dev/null || { if pgrep -f '^/usr/bin/python3 /workspace/cf_ws/install/crazyflie_mapf/lib/crazyflie_mapf/mirror_node' >/dev/null; then echo '  (mirror 실행 중이지만 상태를 아직 못 받음: 몇 초 뒤 다시 status)'; else echo '  (실기체 연결 없음: real:=none이거나, 실기체가 꺼져 있어 못 찾았거나, 실행 중이 아님)'; fi; }"
     ;;
   stop)
     # 시뮬레이션 launch만 끈다. 실기체 쪽은 착륙·모터 정지 후 스스로 끝난다(cf_finish).
