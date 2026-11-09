@@ -231,6 +231,20 @@ docker/mapf.sh emergency     # 실행 중인 전체 비상 정지
 docker/mapf.sh stop          # 또는 터미널 1에서 Ctrl+C
 ```
 
+**실제 드론 한 대로 비행하는 순서** (예: cf5, 모캡 없이)
+
+```bash
+# 터미널 1 (cf5를 평평한 곳에 두고 켠 뒤 손대지 않기, 기수는 +x 방향)
+docker/mapf.sh mirror real:=cf5 mocap:=false
+
+# 터미널 2 (터미널 1 로그에 "[mirror] 실기체: cf5"가 나온 뒤)
+docker/mapf.sh status    # cf5 WAITING ready (start 가능) 확인
+docker/mapf.sh start
+
+# 터미널 3 (만일을 위해 미리 입력만 해두고, 위험하면 Enter)
+docker/mapf.sh estop 5
+```
+
 - 실제 드론이 연결되면 시뮬레이션도 `start`를 기다린다. 시뮬레이션만 돌릴 때는 바로 출발한다.
 - 비상 정지나 추락 후 드론은 잠긴 상태(`Locked, reboot required`)가 된다. 전원을 껐다 켜야 다시 쓸 수 있다.
 - 설정 파일: [`config/mirror/`](cf_ws/src/crazyflie_mapf/config/mirror/) (시뮬레이션·속도·공간·안전 기준),
