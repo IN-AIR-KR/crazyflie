@@ -1,6 +1,97 @@
 crazyflie_mapf/crazyflie_mapf  — 파이썬 패키지 설명
 ====================================================
 
+[빠른 명령 모음]  모든 명령은 호스트 ~/crazyflie 에서 실행한다.
+-----------------------------------------------------------------
+
+A. 시뮬레이션만 (실기체는 절대 건드리지 않음, real:=none 고정)
+
+    docker/mapf.sh up                       컨테이너 켜기 (처음 한 번은 docker/mapf.sh build)
+    docker/mapf.sh sim                      5대 기본 배치 (오각형, 맞은편으로 이동)
+    docker/mapf.sh sim gazebo:=false        RViz 만
+
+    # 정사각형 대각선 교환 (cf1~cf4 가 (±1,±1) 꼭짓점에서 맞은편으로, cf5 는 가장자리 호버)
+    docker/mapf.sh sim \
+      start:=cf1:1,1/cf2:-1,1/cf3:-1,-1/cf4:1,-1/cf5:-1.6,0 \
+      goal:=cf1:-1,-1,1.0/cf2:1,-1,1.0/cf3:1,1,1.0/cf4:-1,1,1.0/cf5:-1.6,0,1.0
+
+    끄기: Ctrl+C 또는 다른 터미널에서 docker/mapf.sh stop
+
+
+B. 시뮬레이션 + 실기체 대응 (mirror: 실기체가 같은 이름의 시뮬레이션 드론을 따라 함)
+
+    docker/mapf.sh scan                     켜진 실기체 확인 (이름, 주소, 배터리, 덱)
+
+    # 터미널 1: 실행 (real:= 로 대상을 꼭 명시한다. 생략하면 응답하는 기체 전부 자동 연결)
+    docker/mapf.sh mirror real:=cf1,cf2,cf3,cf4 positioning:=lighthouse \
+      start:=cf1:1,1/cf2:-1,1/cf3:-1,-1/cf4:1,-1/cf5:-1.6,0 \
+      goal:=cf1:-1,-1,1.0/cf2:1,-1,1.0/cf3:1,1,1.0/cf4:-1,1,1.0/cf5:-1.6,0,1.0
+
+    # 터미널 2: 조작
+    docker/mapf.sh status                   실기체가 ready 인지 확인
+    docker/mapf.sh start                    이륙 (실기체는 start 전에는 뜨지 않는다)
+    docker/mapf.sh land                     전체 착륙 (모두 도착하면 자동 착륙도 함)
+    docker/mapf.sh emergency                전체 모터 즉시 정지
+    docker/mapf.sh estop 3                  설정 이름 cf3 만 강제 정지 (estop all 가능)
+
+    positioning:=mocap       Qualisys 모캡 (기본값, config/hardware/motion_capture.yaml)
+    positioning:=lighthouse  Lighthouse 덱 + 기지국 (config/hardware/lighthouse.yaml)
+    positioning:=onboard     자체 추정, 놓인 자리를 시작점으로 (Flow/Lighthouse/Loco 덱)
+
+    실기체만 (시뮬레이션 없이): docker/mapf.sh hardware positioning:=lighthouse
+      → config/hardware/ 의 robots.yaml(enabled)·goals.yaml 사용, start/goal 인자도 동일.
+
+    종료하면 실기체는 착륙 → 모터 정지 → 전원 끔 (MAPF_POWER_OFF=0 이면 전원 유지).
+
+
+C. 드론 등록 방법 (config/hardware/robots.yaml)
+
+    실기체는 "설정 이름(cf1...) ↔ 무선 주소(uri)" 로 등록한다. mirror 에서는 같은 이름의
+    시뮬레이션 드론(config/mirror/robots.yaml)을 따라 하므로, 이름이 양쪽에 있어야 한다.
+
+      cf3:
+        enabled: false                          mirror 에서는 무시 (real:= 로 고른 기체만 켜짐)
+                                                hardware 모드에서는 true 인 기체만 비행
+        uri: "radio://0/80/2M/E7E7E7E7E5"       동글/채널/속도/주소 — 실물 5번
+        initial_position: [0.9708, -0.7053, 0.0] hardware 모드 시작점 (mirror 에서는 무시)
+        type: cf21_active
+
+    순서:
+      1. docker/mapf.sh scan 으로 실물의 주소·채널 확인 (모르면 cfclient 로 확인)
+      2. 연결할 시뮬레이션 이름(cf1~cf5)의 uri 를 그 주소로 바꾼다
+      3. 모캡을 쓰면 QTM rigid body 이름도 설정 이름과 같게 (실물 5번 → "cf3")
+      4. 활성 기체끼리 uri 가 겹치면 안 된다
+         (지금 cf3 과 cf5 가 둘 다 E7E7E7E7E5 → real:= 로 cf5 를 빼고 실행할 것)
+      5. 동글 하나에 3~4대 권장. 더 많으면 radio://1/... 로 나누고 채널도 다르게
+
+    현재 대응: cf1 = 실물 1번, cf2 = 실물 2번, cf3 = 실물 5번, cf4 = 실물 7번
+    estop 번호도 설정 이름을 따른다 (estop 3 = 실물 5번, estop 4 = 실물 7번).
+
+
+D. 초기 위치·목표 위치 지정
+
+    방법 1) 실행 인자 (YAML 수정 없이 이번 실행에만 적용)
+      start:=이름:x,y[,z]/이름:x,y...     x,y 만 쓰면 바닥(z=0)
+      goal:=이름:x,y,z/이름:x,y...        x,y 만 쓰면 YAML 목적지 높이 유지
+      - 기체는 / 로 구분, 지정하지 않은 기체는 YAML 값 사용
+      - sim / mirror / hardware / legacy 모두 동일
+      - 실행 로그 첫머리에 "cf1: 시작 (...) -> 목적지 (...)" 가 찍힌다
+
+    방법 2) YAML 수정 (계속 쓰는 기본값, 수정 후 launch 만 다시 실행하면 적용)
+      sim / mirror   시작점: config/mirror/robots.yaml 의 initial_position
+                     목적지: config/mirror/goals.yaml
+      hardware       시작점: config/hardware/robots.yaml 의 initial_position
+                     목적지: config/hardware/goals.yaml
+      기체를 빼려면 robots.yaml 에서 enabled: false + goals.yaml 에서 그 기체 삭제.
+
+    규칙 (어기면 시작 전에 거부)
+      - 비행 공간: x, y 는 ±1.8 m, 목적지 z 는 0.2~2.0 m (이륙 높이 1.0 m)
+      - 목적지끼리, 이륙 높이에서의 시작점끼리 수평 0.52 m 이상 떨어져야 함
+      - 켜진 시뮬레이션 기체(지금 cf1~cf5) 모두에 목적지가 있어야 함
+      - mirror 실기체는 바뀐 시작점에 놓아야 이륙 (0.15 m 안에 2초 이상 정지)
+      - 좌표 원점: 모캡은 QTM world, Lighthouse 는 cfclient 에서 잡은 기지국 원점
+
+
 이 폴더는 ROS 2 패키지 crazyflie_mapf 의 실제 파이썬 코드다.
 여러 대의 Crazyflie 드론이 서로, 그리고 장애물과 부딪히지 않고 각자의
 목적지로 이동하도록 궤적을 계산(DMPC)하고, 그 궤적을 시뮬레이터(SIL)나
