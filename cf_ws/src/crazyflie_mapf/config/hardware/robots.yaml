@@ -38,7 +38,7 @@ robots:
 
   cf5:
     enabled: false
-    uri: "radio://0/80/2M/E7E7E7E7E5"
+    uri: "radio://0/80/2M/E7E7E7E7E9"
     initial_position: [-0.3708, 1.1413, 0.0]
     type: cf21_active
 
