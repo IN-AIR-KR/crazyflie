@@ -1,10 +1,16 @@
 # 실기체용 기체 설정 (Crazyswarm2 crazyflies.yaml 형식, fileversion 3).
 # hardware.launch.py가 이 파일을 crazyflie_server와 motion_capture_tracking에 그대로 전달한다.
 #
+# 위치 측정은 hardware.yaml의 positioning을 따른다 (현재 lighthouse: 기지국 1·2).
+#   - lighthouse: 좌표는 cfclient 지오메트리 추정 때 정한 world(원점=비행 공간 중앙 바닥).
+#     launch가 아래 cf21_active 유형을 자동으로 cf21_active_lighthouse(모캡 끔)로 바꾼다.
+#     locSrv(외부 위치) 파라미터는 Lighthouse에서는 쓰이지 않는다.
+#   - mocap: 기체 이름(cf1...)이 QTM rigid body 이름과 같아야 pose가 연결된다.
+#
 # 반드시 실제 값으로 바꿀 것:
 #   - uri: radio://<동글 번호>/<채널>/<전송 속도>/<기체 주소>
-#   - initial_position: 실제로 놓은 위치 (Qualisys world 좌표, m). 실제 위치와 0.1m 이상 다르면 안 된다.
-#   - 기체 이름(cf1...)은 QTM rigid body 이름과 같아야 pose가 연결된다.
+#   - initial_position: 실제로 놓은 위치 (world 좌표, m). 실제 위치와 0.1m 이상 다르면 안 된다.
+#     실행 인자 start:=cf1:x,y 로 이번 실행에만 덮어쓸 수 있다.
 #
 # 처음에는 cf1 한 대만 켜서 시험하고, 2대 → 3대 → 5대 순서로 enabled를 늘린다.
 # 한 동글당 3~4대를 권장한다. 그 이상이면 동글을 추가해 radio://1/... 처럼 나누고,
@@ -25,7 +31,7 @@ robots:
     type: cf21_active
 
   cf3:
-    enabled: false
+    enabled: true
     uri: "radio://0/80/2M/E7E7E7E7E5"
     initial_position: [0.9708, -0.7053, 0.0]
     type: cf21_active

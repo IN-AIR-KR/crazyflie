@@ -30,6 +30,7 @@ class DroneExecutorNode:
         self.phase_started = self.now()
         self.stable_since = None
         self.land_requested = False
+        self._descent = None  # low-level landing: {name: (stop position, yaw)}
         # Hardware runs wait for an explicit {"op": "start"} before takeoff.
         self.start_requested = not require_start
         self.last_state_publish = None
@@ -144,6 +145,38 @@ class DroneExecutorNode:
         self.stack.land(height=self.settings["land_height"], duration=self.settings["land_duration"], wait=False)
         self._phase("LANDING", now)
 
+    def _start_descent(self, now, setpoints):
+        """Low-level landing: keep streaming full-state setpoints straight down.
+
+        Hardware flights crashed ("SUP: Crashed") right after the handoff from streamed
+        setpoints to the high-level land command, so there is no handoff at all here.
+        """
+        self._descent = {name: (setpoints[name].position, setpoints[name].yaw) for name in self.names}
+        self._phase("DESCENDING", now)
+
+    def _descend(self, now, fresh, states):
+        elapsed = now - self.phase_started
+        floor, speed = self.settings["land_height"], self.settings["land_speed"]
+        longest = 0.0
+        for name in self.names:
+            (x, y, z0), yaw = self._descent[name]
+            duration = max(0.0, z0 - floor) / speed
+            longest = max(longest, duration)
+            z, vz = (z0 - speed * elapsed, -speed) if elapsed < duration else (floor, 0.0)
+            self.handles[name].cmdFullState((x, y, z), (0.0, 0.0, vz), (0.0, 0.0, 0.0), yaw, (0.0, 0.0, 0.0))
+        settled = longest + self.settings["land_settle"]
+        if elapsed < settled:
+            return
+        if fresh and all(states[name]["position"][2] <= floor + self.settings["arrival_radius"] for name in self.names):
+            for handle in self.handles.values():
+                handle.arm(False)  # motors off on the floor
+            self._phase("LANDED", now)
+        elif elapsed > settled + self.settings["land_duration"]:
+            self.node.get_logger().error("low-level landing did not reach the floor: falling back to the high-level land")
+            for handle in self.handles.values():
+                handle.notifySetpointsStop()
+            self._land(now)
+
     def _publish_states(self, now, fresh):
         if set(self.estimator.states) != set(self.names):
             return
@@ -174,6 +207,10 @@ class DroneExecutorNode:
                 if self.stable_since is None:
                     self.stable_since = now
                 if now - self.stable_since >= 0.2:
+                    if self.settings.get("land_low_level"):
+                        # A previous low-level landing ended with disarm; arming twice is harmless.
+                        for handle in self.handles.values():
+                            handle.arm(True)
                     self.stack.takeoff(height=self.settings["takeoff_height"], duration=self.settings["takeoff_duration"], wait=False)
                     self._phase("TAKEOFF", now)
             else:
@@ -196,6 +233,8 @@ class DroneExecutorNode:
         elif self.phase == "LANDING":
             if fresh and now - self.phase_started >= self.settings["land_duration"] and all(states[name]["position"][2] <= self.settings["land_height"] + self.settings["arrival_radius"] for name in self.names):
                 self._phase("LANDED", now)
+        elif self.phase == "DESCENDING":
+            self._descend(now, fresh, states)
         if self.phase in ("AIRBORNE", "BRAKING_FOR_LAND"):
             if not fresh:
                 self.executor.invalidate("STALE_STATE")
@@ -206,9 +245,12 @@ class DroneExecutorNode:
                 command = setpoints[name]
                 self.handles[name].cmdFullState(command.position, command.velocity, command.acceleration, command.yaw, command.omega)
             if self.phase == "BRAKING_FOR_LAND" and all(command.mode == "HOVER" for command in setpoints.values()) and fresh and all(norm(states[name]["velocity"]) <= self.settings["arrival_speed"] for name in self.names):
-                for handle in self.handles.values():
-                    handle.notifySetpointsStop()
-                self._phase("LAND_HANDOFF", now)
+                if self.settings.get("land_low_level"):
+                    self._start_descent(now, setpoints)
+                else:
+                    for handle in self.handles.values():
+                        handle.notifySetpointsStop()
+                    self._phase("LAND_HANDOFF", now)
         self._publish_states(now, fresh)
 
 

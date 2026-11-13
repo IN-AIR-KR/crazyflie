@@ -28,11 +28,16 @@ command_ttl: 0.4
 bounds: [[-1.8, -1.8, 0.2], [1.8, 1.8, 2.0]]
 arrival_radius: 0.12
 arrival_speed: 0.15
-takeoff_height: 0.7
+takeoff_height: 0.25
 takeoff_duration: 3.0
 takeoff_timeout: 15.0
 land_height: 0.04
 land_duration: 3.0
+# 2026-11-13: 저수준 스트리밍 → 고수준 land 전환 직후 매번 "SUP: Crashed"로 모터가 꺼져 추락했다.
+# 그래서 실기체는 착륙도 cmdFullState로 끝까지 내려온 뒤 disarm 한다.
+land_low_level: true
+land_speed: 0.15
+land_settle: 0.5
 # 모든 목적지 도착 후 auto_land_delay초 호버한 뒤 전체 착륙한다. false면 호버를 유지한다.
 auto_land: true
 auto_land_delay: 2.0

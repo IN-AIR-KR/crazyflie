@@ -27,6 +27,11 @@ takeoff_duration: 3.0
 takeoff_timeout: 15.0
 land_height: 0.04
 land_duration: 3.0
+# 착륙 방식. false: 고수준 land 명령(notify_setpoints_stop 후 넘겨줌).
+# true: cmdFullState로 land_speed[m/s]로 land_height까지 내려온 뒤 land_settle[s] 머물고 disarm(모터 정지).
+land_low_level: false
+land_speed: 0.15
+land_settle: 0.5
 # 모든 목적지 도착 후 auto_land_delay초(시뮬레이션 시간) 호버한 뒤 전체 착륙한다. false면 호버를 유지한다.
 auto_land: true
 auto_land_delay: 2.0

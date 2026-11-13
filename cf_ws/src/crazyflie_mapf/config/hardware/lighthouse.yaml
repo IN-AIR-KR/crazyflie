@@ -11,8 +11,11 @@
 #
 # 시작 위치 검사는 모캡과 같다: 기체가 시작점(+offset)에서 home_tolerance 안에 있어야 이륙한다.
 
-system_file: ""            # 예: lighthouse_system.yaml (cfclient에서 저장한 기지국 설정)
-upload_system: true        # false면 system_file이 있어도 업로드하지 않는다.
+system_file: lighthouse_system.yaml  # 기지국 1·2 캘리브레이션 결과 (cfclient "Save system config"로 이 폴더에 저장)
+                                     # 파일이 없으면 launch가 멈춘다. 기체에 저장된 값을 쓰려면 ""로 둔다.
+upload_system: false       # false면 system_file이 있어도 업로드하지 않는다.
+                           # 2026-11-13: cf1에는 같은 설정이 이미 저장됨. 재업로드 시 "저장 실패" 응답으로 launch가 멈춰서 끔.
+                           # 다른 기체에 기지국 설정을 올릴 때 true로 바꾼다.
 
 # Lighthouse 기체에만 적용되는 firmware 파라미터. robots.yaml의 all.firmware_params 위에 덮어쓴다.
 firmware_params:

@@ -5,7 +5,7 @@ backend: cpp
 #   mocap       Qualisys (motion_capture_tracking, motion_capture_file)
 #   lighthouse  Lighthouse 덱 + 기지국 (lighthouse_file)
 #   onboard     모캡 없이 기체 자체 추정 (robots.yaml의 initial_position과 실제 위치가 같아야 한다)
-positioning: mocap
+positioning: lighthouse     # 기지국 1·2 (V2) 기준. Qualisys로 돌아가려면 mocap
 motion_capture_file: motion_capture.yaml
 lighthouse_file: lighthouse.yaml
 rviz: true

@@ -73,12 +73,19 @@ class Node:
 class Handle:
     def __init__(self):
         self.full_states = 0
+        self.last_full_state = None
+        self.arms = []
+        self.notified = 0
 
-    def cmdFullState(self, *_args):
+    def cmdFullState(self, *args):
         self.full_states += 1
+        self.last_full_state = args
 
     def notifySetpointsStop(self):
-        pass
+        self.notified += 1
+
+    def arm(self, arm=True):
+        self.arms.append(arm)
 
 
 class Stack:
@@ -161,5 +168,43 @@ def test_failed_takeoff_lands_automatically():
     stack, node = make(require_start=False)
     settle(stack, node)
     # The drone never reaches takeoff height before the timeout.
-    settle(stack, node, height=0.3, seconds=node.settings['takeoff_timeout'] + 1.0)
+    short = node.settings['takeoff_height'] - 2 * node.settings['arrival_radius']
+    settle(stack, node, height=short, seconds=node.settings['takeoff_timeout'] + 1.0)
     assert node.phase == 'LANDING' and stack.allcfs.calls == ['takeoff', 'land']
+
+
+def _airborne_then_land(require_start=False):
+    stack, node = make(require_start=require_start)
+    settle(stack, node)
+    settle(stack, node, height=node.settings['takeoff_height'], seconds=4.0)
+    assert node.phase == 'AIRBORNE'
+    control(node, 'land')
+    settle(stack, node, height=node.settings['takeoff_height'], seconds=0.1)
+    return stack, node
+
+
+def test_hardware_lands_with_streamed_setpoints_and_disarms():
+    """No streamed -> high-level handoff (it crashed on hardware): descend with cmdFullState, then disarm."""
+    stack, node = _airborne_then_land()
+    handle = stack.handles['cf1']
+    assert node.settings['land_low_level'] is True
+    assert node.phase == 'DESCENDING' and handle.notified == 0
+    s = node.settings
+    descent = (s['takeoff_height'] - s['land_height']) / s['land_speed']
+    settle(stack, node, height=s['takeoff_height'], seconds=descent / 2)
+    position, velocity = handle.last_full_state[0], handle.last_full_state[1]
+    assert s['land_height'] < position[2] < s['takeoff_height'] and velocity[2] == -s['land_speed']
+    settle(stack, node, height=s['land_height'], seconds=descent / 2 + s['land_settle'] + 0.2)
+    assert node.phase == 'LANDED'
+    assert handle.last_full_state[0][2] == s['land_height']
+    assert handle.arms == [True, False]          # armed before takeoff, disarmed on the floor
+    assert stack.allcfs.calls == ['takeoff'] and handle.notified == 0
+
+
+def test_low_level_landing_falls_back_when_the_floor_is_not_reached():
+    stack, node = _airborne_then_land()
+    s = node.settings
+    descent = (s['takeoff_height'] - s['land_height']) / s['land_speed']
+    settle(stack, node, height=s['takeoff_height'], seconds=descent + s['land_settle'] + s['land_duration'] + 0.5)
+    assert node.phase == 'LANDING' and stack.allcfs.calls == ['takeoff', 'land']
+    assert stack.handles['cf1'].arms == [True]    # never disarmed in the air
