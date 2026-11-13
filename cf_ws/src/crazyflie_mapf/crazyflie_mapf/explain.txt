@@ -1,0 +1,215 @@
+crazyflie_mapf/crazyflie_mapf  — 파이썬 패키지 설명
+====================================================
+
+이 폴더는 ROS 2 패키지 crazyflie_mapf 의 실제 파이썬 코드다.
+여러 대의 Crazyflie 드론이 서로, 그리고 장애물과 부딪히지 않고 각자의
+목적지로 이동하도록 궤적을 계산(DMPC)하고, 그 궤적을 시뮬레이터(SIL)나
+실기체에 보내 비행시키는 일을 한다.
+
+핵심 아이디어
+  - 중앙 PC 한 대가 모든 드론의 계산을 하지만, 계산 방식은 "드론마다 자기 QP를
+    따로 푸는" 분산 MPC(DMPC)다. 이웃 드론의 예측 궤적을 주고받으며 반복해서
+    충돌을 없앤다. (Luis et al., RA-L 2020, arXiv:1909.05150 을 실용적으로 변형)
+  - 노드 사이 데이터는 모두 std_msgs/String 에 담긴 JSON(version=1)이다.
+  - 계산 로직(functions.py, qp.py, priority.py 등)은 ROS 없이 동작하고,
+    main.py 들이 ROS 와 연결하는 얇은 어댑터 역할을 한다.
+
+
+1. 전체 데이터 흐름
+-------------------
+
+   config/*.yaml (robots, goals, planner, obstacles)
+          │
+          ▼
+   ┌──────────────┐  /fleet/goals        ┌───────────────────┐
+   │ fleet_manager │ ───────────────────▶ │ trajectory_planner │
+   │  (fleet/)     │                      │  (trajectory/)     │
+   └──────────────┘                      └───────────────────┘
+          ▲   │ /fleet/control (land)              │ /fleet/trajectories
+          │   ▼                                    ▼
+          │  ┌──────────────────────────────────────────┐
+          └──│ drone_executor (executor/)               │──▶ Crazyswarm2 서버
+ /fleet/states│  이륙 → 궤적 샘플링 → cmdFullState → 착륙 │    (crazyflie_sim 또는 실기체)
+             └──────────────────────────────────────────┘
+                     ▲  /tf, /<cf>/pose (위치 측정)
+
+   - fleet_manager    : 목적지 배정, 도착 여부 판정, 전원 도착 시 자동 착륙 요청
+   - trajectory_planner: 측정 상태 + 목적지로 매 주기 DMPC 계산, 궤적 묶음 발행
+   - drone_executor   : 궤적을 같은 시각으로 샘플링해 모든 드론에 동시에 명령
+   - mirror_node      : (mirror 모드) 시뮬레이션 드론의 명령을 실기체에 그대로 복사
+
+
+2. 파일·폴더별 설명
+-------------------
+
+[최상위]
+  __init__.py
+      priority.py 의 PrioritySearch, precedes, topological_order 를 외부에 노출.
+
+  priority.py   (PBS 우선순위 탐색, DMPC 비행에는 현재 사용하지 않음)
+      Priority-Based Search(arXiv:1812.06356)의 "부분 우선순위 분기" 아이디어를
+      응용한 속도 계획 탐색. 공간 경로를 새로 찾는 완전한 PBS 가 아니라,
+      이미 있는 경로에 대해 드론별 속도 후보를 고르고 충돌 쌍마다 누가 먼저
+      갈지(winner → loser)를 분기·백트래킹으로 정한다.
+        - precedes()          : 우선순위 그래프에서 간접 선행 관계 확인 (순환 방지)
+        - topological_order() : 우선순위 그래프를 실행 순서로 정렬
+        - PrioritySearch.solve(): TTC(충돌까지 시간)가 짧은 충돌부터 양방향으로
+          분기, evaluate 콜백으로 안전성 검사.
+          결과 status: SOLVED / PARTIAL / BLOCKED / SEARCH_LIMIT
+      최적성·완전성은 보장하지 않는다.
+
+  demo.py   (실행명: priority_demo)
+      두 드론이 동시에 움직이면 안 되는 가상 조건으로 PrioritySearch 를
+      돌려 결과 JSON 을 출력하는 예제. ROS 노드나 비행 명령은 없다.
+
+
+[trajectory/]  — DMPC 궤적 계획 (실행명: trajectory_planner)
+  qp.py
+      AgentQP: 드론 한 대의 QP. 결정변수는 dt 간격의 3축 가속도.
+      이중적분기(위치·속도) 모델로 미래 위치를 선형식으로 표현하고,
+      목표 접근 비용 + 가속도 크기 + 가속도 변화량을 최소화한다.
+      제약: 작업공간 경계, 속도/가속도 상한(L1 다면체로 보수적 근사),
+      끝 속도 0, 충돌 회피용 반평면(half-space) 제약. 솔버는 OSQP.
+
+  functions.py
+      MultiDroneTrajectoryPlanner.plan(states, goals, now) 가 핵심.
+        1) 측정 상태를 같은 시각으로 맞추고 유효성 검사(stale, frame, 경계).
+        2) 정상 추적 중이면 이전 궤적 기준점에서 이어서 계산(nominal),
+           크게 벗어났거나 목적지가 바뀌면 측정값에서 다시 시작(event reset).
+        3) 드론별로 장애물/이웃 무시한 QP 를 먼저 풂.
+        4) 충돌이 예상되는 드론에는 옆으로 비켜가는 대칭 깨기 가이드 추가.
+        5) Gauss-Seidel 방식 교환 반복(exchange_iterations): 각 쌍의 가장 이른
+           충돌 시점에 분리 반평면 제약을 추가하고 다시 QP 를 푼다.
+        6) 연속 시간 swept 검사(swept_pair)로 드론-드론, 드론-장애물 충돌이
+           전혀 없을 때만 SOLVED. 실패하면 감속 궤적(BRAKING)을 만들고,
+           감속 궤적조차 안전하지 않으면 UNSAFE.
+      충돌 판정은 수평/수직 분리거리가 다른 타원체(horizontal_separation,
+      vertical_separation) 기준. sample_trajectory()는 등가속도 구간 궤적을
+      임의 시각에서 위치/속도로 평가한다.
+
+  main.py
+      TrajectoryPlannerNode: /fleet/states, /fleet/goals 구독 →
+      plan_rate 주기로 plan() → /fleet/trajectories, /trajectory/status 발행.
+      preview 모드에서는 실제 상태 대신 "궤적을 완벽히 따라간다"고 가정한
+      가상 상태를 스스로 만들어 발행한다.
+
+  metrics.py
+      FleetMetrics: 계획기 검증과 독립적으로 실제 측정 위치로
+      최소 거리, 추적 오차 등 편대 지표를 계산.
+
+  visualization.py, display_geometry.py
+      RViz 마커: 실제 비행 궤적(trail), 예측 궤적, 드론 크기만큼 두께가 있는
+      튜브(swept_tube), "+1s" 같은 시간 표시. display_geometry 는 ROS 없이
+      기하만 계산한다.
+
+
+[executor/]  — 비행 실행기 (실행명: drone_executor, gazebo_pose_bridge)
+  functions.py   (ROS 없음)
+      - Trajectory          : 계획기 JSON 궤적 파싱·샘플링
+      - StateEstimator      : 타임스탬프 위치들로 속도 추정
+      - FleetExecutor       : 편대 궤적 묶음을 검증 후 원자적으로 교체,
+                              같은 시각으로 모든 드론의 FullStateSetpoint 를 생성.
+                              궤적이 오래되거나 잘못되면 감속 → HOVER.
+      - FullStateSetpoint   : 위치/속도/가속도/yaw 명령 묶음
+
+  main.py
+      DroneExecutorNode: 하나의 타이머(stream_rate)로 모든 드론에 같은 틱에서
+      cmdFullState 를 보낸다. 상태기(phase):
+        WAITING_POSE → TAKEOFF → AIRBORNE → (land 요청) BRAKING_FOR_LAND
+        → LAND_HANDOFF → LANDING → LANDED
+        예외: TAKEOFF_FAILED(자동 착륙), EMERGENCY(모터 즉시 정지)
+      /fleet/control 로 {"op": "start" | "land" | "emergency"} 를 받는다.
+      실기체 모드(require_start)에서는 start 명령이 올 때까지 이륙하지 않는다.
+      측정 상태를 /fleet/states 로 발행한다.
+
+  stack.py
+      crazyflie_py 의 Crazyswarm 을 감싼 어댑터. mirror 모드에서 /real/cf1/...
+      같은 실기체 서비스를 시뮬레이션 드론으로 착각하지 않도록 필터링.
+
+  gazebo_pose_bridge.py
+      SIL 드론의 TF 위치와 움직이는 장애물 위치를 Gazebo 모델에 반영(30Hz).
+      (드론 동역학은 Gazebo 가 아닌 crazyflie_sim 이 계산한다.)
+
+
+[fleet/]  — 편대 임무 관리 (실행명: fleet_manager)
+  functions.py
+      FleetManager: 목적지 검증, 배정(revision/goal_id), 실행 중 목적지 요청과
+      큐, 도착(COMPLETED) 판정, 상태 스냅샷.
+      AutoLand: 모든 드론이 delay 초 동안 도착 상태를 유지하면 착륙을 한 번 요청.
+  main.py
+      FleetManagerNode: /fleet/states, /fleet/goal_request 구독 →
+      /fleet/goals, /fleet/status, /trajectory/goals(RViz 목적지 마커),
+      /fleet/control(자동 착륙) 발행.
+
+
+[mirror/]  — 시뮬레이션 + 실기체 따라 하기 (실행명: mirror_node)
+  기본 원칙: 시뮬레이션이 주인이다. 모든 드론은 SIL 에서 날고 DMPC 는 실기체
+  상태를 보지 않는다. 실기체는 자기 쌍둥이(같은 이름의 시뮬레이션 드론)의
+  이륙·FullState 명령·착륙을 그대로 따라 한다.
+
+  functions.py   MirrorSupervisor (ROS 없음)
+      실기체마다 WAITING → FLYING → STOPPING → LANDING 상태 관리.
+      위치 측정이 끊기거나 쌍둥이와 너무 벌어지는 등 가드에 걸리면 그 기체만
+      착륙시키고 시뮬레이션은 계속된다.
+  main.py        MirrorNode: 시뮬레이션 명령을 /<namespace>/<cf> 실기체 서버로 전달.
+  detect.py      무선(Crazyradio)으로 응답하는 설정 기체 찾기 (null 패킷 ping).
+  scan.py        현재 잡히는 기체·배터리·덱 목록 출력 (mapf.sh scan).
+  estop.py       번호로 실기체 비상정지, 모터 즉시 정지 (mapf.sh estop 2 / all).
+  shutdown.py    mirror 종료 후 착륙한 실기체 전원을 무선으로 끔.
+
+
+[common/]  — 공통 도구와 launch 구현
+  config.py            3D 좌표 검증, JSON encode/decode(version=1 확인)
+  fleet.py             /fleet/states, /fleet/goals 메시지 형식 검증
+  ros.py               QoS(TRANSIENT_LOCAL), STEADY 타이머, spin, ROS 시간
+  markers.py           RViz 마커 생성과 드론별 색상
+  trajectory.py        YAML 로딩(load_experiment: robots/planner/goals/obstacles
+                       를 시작 전에 전부 검증), 공통 명령줄 인자
+  obstacles.py         박스 장애물 로딩, 왕복(ping_pong) 운동 계산,
+                       박스를 감싸는 보수적 타원체, 목적지/이륙 경로 검사
+  simulation_launch.py SIL 시뮬레이션 공통 실행(none/static/dynamic 모드)
+  hardware_launch.py   실기체 비행: Crazyswarm2 서버 + 모캡(Qualisys) + DMPC 노드.
+                       프로세스 하나가 죽어도 전체 launch 를 끄지 않는다
+                       (서버가 죽으면 드론이 추락하므로).
+  mirror_launch.py     전체 시뮬레이션 + 응답하는 실기체를 /real 네임스페이스의
+                       두 번째 서버로 띄우고 mirror_node 연결.
+
+  (launch/*.launch.py 파일들은 위 common/*_launch.py 를 호출하는 얇은 진입점이다.)
+
+
+3. 주요 토픽 정리
+-----------------
+  /fleet/goals         fleet_manager → planner, executor   목적지 묶음(revision)
+  /fleet/goal_request  외부 → fleet_manager                실행 중 목적지 변경 요청
+  /fleet/trajectories  planner → executor                  편대 궤적 묶음 + status
+  /fleet/states        executor → planner, fleet_manager   측정 상태 + phase
+  /fleet/control       외부/fleet_manager → executor       start / land / emergency
+  /fleet/status        fleet_manager                       임무 진행 상태
+  /trajectory/status   planner                             계산 결과, 지표, 소요 시간
+
+
+4. 계획 상태(status) 의미
+-------------------------
+  SOLVED   모든 쌍·장애물에 대해 연속 시간 검사를 통과한 궤적
+  BRAKING  해를 못 찾아 감속 궤적으로 대체(안전 검사는 통과)
+  UNSAFE   감속 궤적조차 안전을 보장하지 못함
+  STALE    상태/목적지가 없거나 오래됨
+  WAITING  이륙 전이거나 상태/목적지가 다 모이지 않아 아직 계획하지 않음
+
+
+5. 실행 방법 (자세한 내용은 ../README.md)
+-----------------------------------------
+  docker/mapf.sh sim        시뮬레이션
+  docker/mapf.sh mirror     시뮬레이션 + 실기체 따라 하기
+  docker/mapf.sh hardware   실기체만
+  docker/mapf.sh start | land | emergency | status | stop
+
+  ros2 run crazyflie_mapf priority_demo     PBS 예제 (ROS 노드 없음)
+
+
+6. 한계
+-------
+  - 지역(local) 계획기다. 복잡한 미로에서 경로를 반드시 찾는 전역 계획기가 아니며,
+    해를 못 찾으면 감속하거나 UNSAFE 를 보고한다.
+  - 장애물은 회전 없는 박스만, 동적 장애물은 미리 알려진 왕복 운동만 지원한다.
+  - 논문 재현이 아니라 실용적 변형이다(하드 충돌 제약, 측정 상태 이중적분기 모델).
