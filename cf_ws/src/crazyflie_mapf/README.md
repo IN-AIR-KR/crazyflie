@@ -166,7 +166,9 @@ docker/mapf.sh build                  # 처음 한 번: 이미지(OSQP 포함) +
 docker/mapf.sh sim                    # 시뮬레이션 5대 (3.6 m). 도착하면 자동 착륙
 docker/mapf.sh mirror                 # 시뮬레이션 + 무선 응답하는 실기체가 따라 함
 docker/mapf.sh mirror real:=cf3,cf5   # 지정한 실기체만
-docker/mapf.sh mirror mocap:=false    # 모캡 없이 기체 자체 위치 추정으로 따라 함
+docker/mapf.sh mirror positioning:=lighthouse   # 모캡 대신 Lighthouse 덱 + 기지국
+docker/mapf.sh mirror positioning:=onboard      # 모캡 없이 기체 자체 추정 (예전 mocap:=false)
+docker/mapf.sh mirror start:=cf1:-1.0,0 goal:=cf1:1.0,0,1.2   # 시작점·목적지 지정
 docker/mapf.sh scan                   # 지금 무선으로 잡히는 기체·배터리·덱 (mirror가 꺼져 있을 때)
 docker/mapf.sh estop 2                # cf2 강제 정지(모터 즉시 끔). estop 2 5 / estop all
 docker/mapf.sh hardware               # 실기체만
@@ -177,6 +179,16 @@ docker/mapf.sh help
 ```
 
 뒤에 붙인 인자는 ros2 launch로 전달된다(예: `docker/mapf.sh sim gazebo:=false`). Ctrl+C로 끄면 Gazebo·RViz도 정리된다.
+
+시작점·목적지는 YAML을 고치지 않고 인자로 줄 수 있다(sim, mirror, hardware, legacy 공통). 지정하지 않은 기체는 YAML 값을 쓴다.
+
+```bash
+# 기체는 /로 구분. start는 x,y(바닥 z=0) 또는 x,y,z, goal은 x,y,z 또는 x,y(YAML 목적지 높이 유지)
+docker/mapf.sh mirror start:=cf1:-1.0,0/cf3:0.9,-0.6 goal:=cf1:1.0,0,1.2/cf3:-0.9,0.6,1.0
+```
+
+바뀐 파일은 `/tmp/mapf_override/<설정 폴더>/`에 만들어지고 모든 노드가 그 파일을 읽는다. 경계·간격 검사는 YAML과 같고,
+launch 로그 첫머리에 기체별 `시작 -> 목적지`가 출력된다. mirror 모드에서 실기체도 바뀐 시작점에 놓아야 한다.
 GPU 없이 실행하려면 `MAPF_GPU=0 docker/mapf.sh sim`.
 
 ### 직접 실행
@@ -350,17 +362,24 @@ ros2 launch crazyflie_mapf mirror.launch.py real:=none     # 시뮬레이션만
 날던 기체는 그 자리에서 떨어지고, 이후 전원을 껐다 켜야 다시 쓸 수 있다.
 터미널·컨테이너가 강제로 죽으면 착륙 명령을 보낼 수 없다. 그때는 `estop`이나 기체 전원 버튼을 쓴다.
 
-### 위치 측정: 모캡 사용 / 미사용 (`mocap:=true|false`)
+### 위치 측정: 모캡 / Lighthouse / 자체 추정 (`positioning:=mocap|lighthouse|onboard`)
 
-| | `mocap:=true` (기본) | `mocap:=false` |
-| --- | --- | --- |
-| 위치 출처 | Qualisys rigid body (이름 = 기체 이름) | 기체 자체 추정 (Flow/Lighthouse/Loco 덱) |
-| 시작 위치 | 기체를 시뮬레이션 시작점(+offset)의 실제 좌표에 놓아야 함 | 놓은 자리가 시뮬레이션 시작점이 됨 (기수는 +x 방향) |
-| launch 전 검사 | - | 기체마다 덱 확인. 위치 덱이 없거나 연결이 안 되면 그 기체는 시뮬레이션만 |
-| 실행 중 | - | mirror가 `kalman.initialX/Y/Z/Yaw`를 시작점으로 설정하고 `resetEstimation` |
-| 서버 설정 | Mellinger | 모캡 끈 기체 유형(`*_onboard`), PID 컨트롤러 |
+기본값은 `mirror.yaml`·`hardware.yaml`의 `positioning`(mocap)이다. 예전 인자 `mocap:=true|false`는 mocap / onboard와 같다.
+`hardware.launch.py`도 같은 인자를 받는다(launch 전 검사에서 한 대라도 실패하면 시작하지 않는다).
 
-두 모드 모두 이륙 순간 위치가 시작점에서 `home_tolerance` 안에 `settle_time`(2초) 이상 머물러야 띄운다.
+| | `mocap` (기본) | `lighthouse` | `onboard` |
+| --- | --- | --- | --- |
+| 위치 출처 | Qualisys rigid body (이름 = 기체 이름) | Lighthouse 덱 + 기지국 (기지국 좌표 = world) | 기체 자체 추정 (Flow/Lighthouse/Loco 덱) |
+| 시작 위치 | 시뮬레이션 시작점(+offset)의 실제 좌표에 놓아야 함 | 모캡과 같음 | 놓은 자리가 시뮬레이션 시작점이 됨 (기수는 +x 방향) |
+| launch 전 검사 | - | Lighthouse 덱 확인, `system_file`이 있으면 기지국 설정 업로드 | 위치 덱 확인 |
+| 실행 중 | - | - | mirror가 `kalman.initialX/Y/Z/Yaw`를 시작점으로 설정하고 `resetEstimation` |
+| 서버 설정 | Mellinger | 모캡 끈 기체 유형(`*_lighthouse`), `lighthouse.yaml`의 firmware 파라미터 | 모캡 끈 기체 유형(`*_onboard`), PID 컨트롤러 |
+
+Lighthouse 준비(`config/hardware/lighthouse.yaml`): cfclient Lighthouse 탭에서 기지국 geometry를 추정할 때 정한 원점·축이
+planner의 world 좌표가 된다. 원점을 비행 공간 중앙 바닥에 두고, "Save system config"로 저장한 파일을 `system_file`에 적으면
+launch할 때 켜진 기체에 업로드된다(비우면 기체에 저장된 값 사용). 덱이 없거나 업로드에 실패한 기체는 mirror에서는 시뮬레이션만 한다.
+
+세 모드 모두 이륙 순간 위치가 시작점에서 `home_tolerance` 안에 `settle_time`(2초) 이상 머물러야 띄운다.
 위치 덱 없이 모캡도 없으면 추정값이 초당 수 m씩 발산하므로(시험에서 1초에 약 10 m) 이 검사에서 걸러진다.
 모캡 없는 모드에서 추종 오차·지오펜스 검사는 기체 자체 추정값 기준이라, 덱의 누적 오차(드리프트)는 잡지 못한다.
 

@@ -17,8 +17,10 @@ def options(args=None):
     parser.add_argument("--robots", required=True, help="robots.yaml of the simulation")
     parser.add_argument("--real", required=True, help="comma-separated robots to mirror")
     parser.add_argument("--namespace", default="real")
-    parser.add_argument("--onboard", action="store_true",
-                        help="no mocap: robots fly on their onboard estimate, initialised at their simulated start")
+    parser.add_argument("--positioning", choices=("mocap", "lighthouse", "onboard"), default="mocap",
+                        help="mocap / lighthouse: absolute positions, robots must sit at their start; "
+                             "onboard: estimate initialised at the simulated start")
+    parser.add_argument("--onboard", action="store_true", help="legacy: same as --positioning onboard")
     return parser.parse_args(remove_ros_args(sys.argv)[1:] if args is None else args)
 
 
@@ -186,7 +188,8 @@ def main(args=None):
     homes = load_robot_positions(opt.robots)
     names = [name for name in opt.real.split(",") if name]
     settings = mirror_settings(opt.mirror, planner)
-    settings["onboard"] = opt.onboard
+    settings["mode"] = "onboard" if opt.onboard else opt.positioning
+    settings["onboard"] = settings["mode"] == "onboard"
     supervisor = MirrorSupervisor(homes, names, settings)
     rclpy.init(args=args)
     node = rclpy.create_node("mirror")

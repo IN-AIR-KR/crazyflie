@@ -206,7 +206,7 @@ def test_onboard_real_robots_disable_mocap_and_use_pid():
     pytest.importorskip('launch')
     from crazyflie_mapf.common.mirror_launch import real_robots
     hardware = read_mapping(config_directory() / 'hardware' / 'robots.yaml')
-    robots = real_robots(hardware, ['cf3'], HOMES, [0, 0, 0], onboard=True)
+    robots = real_robots(hardware, ['cf3'], HOMES, [0, 0, 0], mode='onboard')
     kind = robots['robots']['cf3']['type']
     assert kind == 'cf21_active_onboard'
     assert robots['robot_types'][kind]['motion_capture']['enabled'] is False
@@ -227,7 +227,7 @@ def test_onboard_mode_keeps_only_robots_with_a_positioning_deck():
     decks = {'u2': [], 'u5': ['Flow2', 'Multiranger'], 'u3': 'timeout'}
     usable, notes = check_decks(['cf2', 'cf3', 'cf5'], uris, read=lambda wanted: decks)
     assert usable == ['cf5']
-    assert any('cf2' in n and 'Flow/Lighthouse/Loco' in n for n in notes)
+    assert any('cf2' in n and 'Flow2/Lighthouse/Loco' in n for n in notes)
     assert any('cf3' in n and '실패' in n for n in notes)
 
 

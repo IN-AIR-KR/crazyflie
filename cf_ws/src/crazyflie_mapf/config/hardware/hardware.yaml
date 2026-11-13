@@ -1,9 +1,13 @@
 # hardware.launch.py 실행 설정. 상대 경로는 이 폴더 기준이다.
 # Crazyswarm2 서버 백엔드: cpp(권장, 다수 기체) 또는 cflib
 backend: cpp
-# Qualisys(motion_capture_tracking) 사용 여부. false면 Lighthouse/Flow deck 등 온보드 추정을 사용한다.
-mocap: true
+# 위치 측정 방식. launch 인자 positioning:=...가 우선한다 (예전 인자 mocap:=true/false도 동작).
+#   mocap       Qualisys (motion_capture_tracking, motion_capture_file)
+#   lighthouse  Lighthouse 덱 + 기지국 (lighthouse_file)
+#   onboard     모캡 없이 기체 자체 추정 (robots.yaml의 initial_position과 실제 위치가 같아야 한다)
+positioning: mocap
 motion_capture_file: motion_capture.yaml
+lighthouse_file: lighthouse.yaml
 rviz: true
 rviz_config: ../visualization.rviz
 # true면 launch 후 바로 이륙하지 않고 /fleet/control의 {"op": "start"}를 기다린다.

@@ -26,13 +26,13 @@ robots:
 
   cf3:
     enabled: false
-    uri: "radio://0/80/2M/E7E7E7E7E3"
+    uri: "radio://0/80/2M/E7E7E7E7E5"
     initial_position: [0.9708, -0.7053, 0.0]
     type: cf21_active
 
   cf4:
     enabled: false
-    uri: "radio://0/80/2M/E7E7E7E7E4"
+    uri: "radio://0/80/2M/E7E7E7E7E7"
     initial_position: [0.9708, 0.7053, 0.0]
     type: cf21_active
 

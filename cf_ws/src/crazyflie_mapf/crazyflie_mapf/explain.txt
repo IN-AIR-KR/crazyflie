@@ -156,6 +156,8 @@ crazyflie_mapf/crazyflie_mapf  — 파이썬 패키지 설명
   scan.py        현재 잡히는 기체·배터리·덱 목록 출력 (mapf.sh scan).
   estop.py       번호로 실기체 비상정지, 모터 즉시 정지 (mapf.sh estop 2 / all).
   shutdown.py    mirror 종료 후 착륙한 실기체 전원을 무선으로 끔.
+  lighthouse.py  cfclient 에서 저장한 Lighthouse 기지국 설정(geometry/calibration)을
+                 기체에 업로드 (positioning:=lighthouse 일 때 launch 가 호출).
 
 
 [common/]  — 공통 도구와 launch 구현
@@ -173,6 +175,12 @@ crazyflie_mapf/crazyflie_mapf  — 파이썬 패키지 설명
                        (서버가 죽으면 드론이 추락하므로).
   mirror_launch.py     전체 시뮬레이션 + 응답하는 실기체를 /real 네임스페이스의
                        두 번째 서버로 띄우고 mirror_node 연결.
+  positioning.py       실기체 위치 측정 방식 선택: mocap / lighthouse / onboard.
+                       Lighthouse 기체 유형(*_lighthouse, 모캡 끔)과 firmware 파라미터
+                       (config/hardware/lighthouse.yaml) 적용.
+  overrides.py         start:= / goal:= launch 인자 처리. 지정한 기체의 시작점·목적지만
+                       바꾼 robots.yaml·goals.yaml 을 /tmp/mapf_override/ 에 만들어 모든
+                       노드가 그 파일을 읽게 한다 (검증은 YAML 과 동일).
 
   (launch/*.launch.py 파일들은 위 common/*_launch.py 를 호출하는 얇은 진입점이다.)
 
@@ -203,6 +211,39 @@ crazyflie_mapf/crazyflie_mapf  — 파이썬 패키지 설명
   docker/mapf.sh mirror     시뮬레이션 + 실기체 따라 하기
   docker/mapf.sh hardware   실기체만
   docker/mapf.sh start | land | emergency | status | stop
+
+  [mirror 와 sim 차이]
+    sim     real:=none 고정. 시뮬레이션만 돌고 실기체는 절대 건드리지 않는다.
+    mirror  기본 real:=auto. 무선으로 응답하는 실기체가 있으면 자동으로 따라 난다.
+            실기체를 쓸 때는 real:=cf1,cf2,... 로 대상을 명시하는 것이 안전하다.
+            실기체는 start 를 보내야 이륙한다 (다른 터미널: docker/mapf.sh start).
+
+  [위치 측정 방식]  positioning:=mocap | lighthouse | onboard  (기본 mocap)
+    docker/mapf.sh mirror positioning:=lighthouse     모캡 대신 Lighthouse 덱 + 기지국
+    docker/mapf.sh hardware positioning:=lighthouse   실기체만 + Lighthouse
+    docker/mapf.sh mirror positioning:=onboard        자체 추정 (예전 mocap:=false)
+    Lighthouse 설정: config/hardware/lighthouse.yaml (system_file 에 cfclient 저장 파일)
+
+  [시작점·목적지 인자]  sim / mirror / hardware / legacy 공통, 지정 안 한 기체는 YAML 값
+    start:=이름:x,y[,z]/이름:x,y...     x,y 면 바닥(z=0)
+    goal:=이름:x,y,z/이름:x,y...        x,y 면 YAML 목적지 높이 유지
+
+  [예: 정사각형 대각선 교환 — cf1~cf4 가 (±1, ±1) 꼭짓점에서 맞은편으로]
+    cf1 (1,1)→(-1,-1)   cf2 (-1,1)→(1,-1)   cf3 (-1,-1)→(1,1)   cf4 (1,-1)→(-1,1)
+    cf5 는 시뮬레이션에 켜져 있으므로 가장자리 (-1.6,0) 에서 제자리 호버.
+
+    # 시뮬레이션만
+    docker/mapf.sh sim \
+      start:=cf1:1,1/cf2:-1,1/cf3:-1,-1/cf4:1,-1/cf5:-1.6,0 \
+      goal:=cf1:-1,-1,1.0/cf2:1,-1,1.0/cf3:1,1,1.0/cf4:-1,1,1.0/cf5:-1.6,0,1.0
+
+    # 실기체 4대 (실물 1,2,5,7 → 설정 이름 cf1,cf2,cf3,cf4) + Lighthouse
+    docker/mapf.sh mirror real:=cf1,cf2,cf3,cf4 positioning:=lighthouse \
+      start:=cf1:1,1/cf2:-1,1/cf3:-1,-1/cf4:1,-1/cf5:-1.6,0 \
+      goal:=cf1:-1,-1,1.0/cf2:1,-1,1.0/cf3:1,1,1.0/cf4:-1,1,1.0/cf5:-1.6,0,1.0
+
+    실물 5번·7번은 config/hardware/robots.yaml 에서 cf3·cf4 의 uri 로 등록되어 있다
+    (estop 3 = 실물 5번, estop 4 = 실물 7번).
 
   ros2 run crazyflie_mapf priority_demo     PBS 예제 (ROS 노드 없음)
 

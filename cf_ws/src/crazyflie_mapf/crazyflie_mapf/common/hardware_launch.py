@@ -12,10 +12,13 @@ from pathlib import Path
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from crazyflie_mapf.common.overrides import declare as declare_overrides, describe, experiment_paths
+from crazyflie_mapf.common.positioning import (LABELS as POSITIONING_LABELS, REQUIRED_DECKS, lighthouse_robots,
+                                               load_lighthouse, resolve as resolve_positioning)
 from crazyflie_mapf.common.trajectory import load_experiment, read_mapping
 
 SERVERS = {'cpp': 'crazyflie_server_cpp', 'cflib': 'crazyflie_server_py'}
@@ -45,14 +48,28 @@ def _mocap_params(robots, path):
     return params
 
 
+def _prepare_lighthouse(robots, names, lighthouse):
+    """Every robot needs a Lighthouse deck and, when a system file is set, its base-station setup.
+    The planner flies the complete fleet, so any failure stops the launch."""
+    from crazyflie_mapf.common.mirror_launch import check_decks, upload_lighthouse
+    uris = {name: robots['robots'][name]['uri'] for name in names}
+    usable, notes = check_decks(names, uris, wanted=REQUIRED_DECKS['lighthouse'])
+    if usable == names:
+        usable, upload_notes = upload_lighthouse(names, uris, lighthouse['system_file'])
+        notes += upload_notes
+    failed = [name for name in names if name not in usable]
+    if failed:
+        raise ValueError('Lighthouse 준비 실패: ' + ' / '.join(notes))
+    return [LogInfo(msg=f'[mapf] {line}') for line in notes]
+
+
 def start(context):
     directory = Path(LaunchConfiguration('config_dir').perform(context)).resolve()
     mode = LaunchConfiguration('obstacles').perform(context)
     if mode not in ('none', 'static'):
         raise ValueError('실기체 obstacles는 none 또는 static입니다. 동적 장애물은 실물 추적이 없어 지원하지 않습니다.')
-    paths = {key: directory / filename for key, filename in (
-        ('robots', 'robots.yaml'), ('planner', 'planner.yaml'), ('goals', 'goals.yaml'), ('obstacles', f'obstacles_{mode}.yaml'))}
-    robots, settings, homes, _ = load_experiment(paths['robots'], paths['planner'], paths['goals'], paths['obstacles'])
+    paths = experiment_paths(context, directory, mode)
+    robots, settings, homes, goals = load_experiment(paths['robots'], paths['planner'], paths['goals'], paths['obstacles'])
     if mode == 'none' and settings['obstacles']:
         raise ValueError('장애물 없는 모드에서는 obstacles: []를 사용하세요.')
     if any('motion' in o for o in settings['obstacles']):
@@ -65,13 +82,20 @@ def start(context):
     backend = LaunchConfiguration('backend').perform(context) or config['backend']
     if backend not in SERVERS:
         raise ValueError('backend는 cpp 또는 cflib입니다.')
-    mocap, rviz, require_start = (_flag(context, key, config) for key in ('mocap', 'rviz', 'require_start'))
+    rviz, require_start = (_flag(context, key, config) for key in ('rviz', 'require_start'))
+    positioning = resolve_positioning(context, config)
+    mocap = positioning == 'mocap'
+    actions = [LogInfo(msg=f'[mapf] {line}') for line in describe(homes, goals)]
+    actions.append(LogInfo(msg=f'[mapf] 위치 측정: {POSITIONING_LABELS[positioning]}'))
+    if positioning == 'lighthouse':
+        lighthouse = load_lighthouse(directory / config.get('lighthouse_file', 'lighthouse.yaml'))
+        actions += _prepare_lighthouse(robots, list(homes), lighthouse)
+        robots = lighthouse_robots(robots, list(homes), lighthouse)
 
     server_yaml = Path(get_package_share_directory('crazyflie')) / 'config/server.yaml'
     server = yaml.safe_load(server_yaml.read_text())['/crazyflie_server']['ros__parameters']
     server['robot_description'] = (Path(get_package_share_directory('crazyflie_description'))
                                    / 'urdf/crazyflie_description.urdf').read_text()
-    actions = []
     if mocap:
         params = _mocap_params(robots, (directory / config['motion_capture_file']).resolve())
         server['poses_qos_deadline'] = params['topics']['poses']['qos']['deadline']
@@ -101,7 +125,9 @@ def generate_launch_description():
         DeclareLaunchArgument('config_dir', default_value=config, description='Folder with hardware robots/planner/goals/obstacles/hardware.yaml'),
         DeclareLaunchArgument('obstacles', default_value='none', description='none / static'),
         DeclareLaunchArgument('backend', default_value='', description='cpp / cflib; empty uses hardware.yaml'),
-        DeclareLaunchArgument('mocap', default_value='', description='true / false; empty uses hardware.yaml'),
+        DeclareLaunchArgument('positioning', default_value='', description='mocap / lighthouse / onboard; empty uses hardware.yaml'),
+        DeclareLaunchArgument('mocap', default_value='', description='legacy: true = positioning:=mocap, false = positioning:=onboard'),
+        *declare_overrides(),
         DeclareLaunchArgument('rviz', default_value='', description='true / false; empty uses hardware.yaml'),
         DeclareLaunchArgument('require_start', default_value='', description='true / false; empty uses hardware.yaml'),
         OpaqueFunction(function=start),

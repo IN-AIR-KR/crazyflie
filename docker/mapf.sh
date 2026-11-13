@@ -13,8 +13,13 @@
 #     sim                   시뮬레이션 5대만 (3.6m, mirror 설정, real:=none)
 #     mirror                시뮬레이션 5대 + 무선 응답하는 실기체가 따라 함 (real:=auto)
 #     mirror real:=cf3,cf5  지정한 실기체만 따라 함
-#     mirror mocap:=false   모캡 없이: 기체 자체 위치 추정(Flow/Lighthouse/Loco 덱 필요)으로 따라 함
-#     hardware              실기체만 (config/hardware)
+#     mirror positioning:=lighthouse  모캡 대신 Lighthouse 덱 + 기지국으로 위치 측정 (config/hardware/lighthouse.yaml)
+#     mirror positioning:=onboard     모캡 없이: 기체 자체 추정을 시작점으로 초기화 (Flow/Lighthouse/Loco 덱). 예전 mocap:=false
+#     hardware              실기체만 (config/hardware). positioning:=lighthouse도 같다
+#
+#     시작점·목적지 지정 (sim, mirror, hardware, legacy 공통. 지정하지 않은 기체는 YAML 값):
+#       start:=cf1:-1.2,0/cf3:0.97,-0.71        x,y (바닥 z=0) 또는 x,y,z
+#       goal:=cf1:1.2,0,1.0/cf3:-0.97,0.71      x,y,z 또는 x,y (YAML 목적지 높이 유지)
 #     legacy [none|static|dynamic]  기존 시뮬레이션 7대 (9m)
 #
 #   점검
@@ -31,6 +36,7 @@
 #
 #   예) docker/mapf.sh sim
 #       docker/mapf.sh mirror real:=cf3,cf5
+#       docker/mapf.sh mirror positioning:=lighthouse start:=cf1:-1.0,0 goal:=cf1:1.0,0,1.0
 #       docker/mapf.sh sim gazebo:=false        (RViz만)
 #       MAPF_GPU=0 docker/mapf.sh sim           (GPU 없이 소프트웨어 렌더링)
 set -euo pipefail
@@ -180,7 +186,7 @@ for name, goal in d[\"robots\"].items(): print(\" \", name, goal[\"status\"])
       echo '[mirror]' && timeout 5 ros2 topic echo --once --field data /mirror/status std_msgs/msg/String 2>/dev/null | python3 -c '
 import json, sys
 d = json.loads(sys.stdin.readline())
-print(\"  위치:\", \"Qualisys 모캡\" if d.get(\"mode\") != \"onboard\" else \"기체 자체 추정 (모캡 없음)\")
+print(\"  위치:\", {\"mocap\": \"Qualisys 모캡\", \"lighthouse\": \"Lighthouse\", \"onboard\": \"기체 자체 추정 (모캡 없음)\"}.get(d.get(\"mode\"), d.get(\"mode\")))
 for name, r in d[\"robots\"].items(): print(\" \", name, r[\"state\"], r[\"reason\"] or r[\"blocked\"] or (\"ready (start 가능)\" if r[\"state\"] == \"WAITING\" else \"\"))
 ' 2>/dev/null || { if pgrep -f '^/usr/bin/python3 /workspace/cf_ws/install/crazyflie_mapf/lib/crazyflie_mapf/mirror_node' >/dev/null; then echo '  (mirror 실행 중이지만 상태를 아직 못 받음: 몇 초 뒤 다시 status)'; else echo '  (실기체 연결 없음: real:=none이거나, 실기체가 꺼져 있어 못 찾았거나, 실행 중이 아님)'; fi; }"
     ;;

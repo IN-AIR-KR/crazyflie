@@ -20,6 +20,9 @@ from launch_ros.actions import Node
 
 from crazyflie_mapf.common import simulation_launch
 from crazyflie_mapf.common.hardware_launch import SERVERS, _mocap_params
+from crazyflie_mapf.common.overrides import declare as declare_overrides, experiment_paths
+from crazyflie_mapf.common.positioning import (LABELS as POSITIONING_LABELS, MODES, REQUIRED_DECKS, lighthouse_robots,
+                                               load_lighthouse, resolve as resolve_positioning, upload_system)
 from crazyflie_mapf.common.trajectory import load_experiment, read_mapping
 
 
@@ -43,16 +46,18 @@ def select_real(argument, simulated, hardware, scan):
     return sorted(found), notes
 
 
-POSITIONING_DECKS = ("Flow2", "Lighthouse", "Loco")
-
-
-def real_robots(hardware, names, homes, offset, onboard=False):
+def real_robots(hardware, names, homes, offset, mode="mocap", lighthouse=None):
     """Hardware robots file with only the mirrored robots enabled, starting at their twins' homes.
 
     onboard (no mocap): the robots use a copy of their type with motion capture disabled, the
     PID controller (steadier with flow-deck estimates, as in crazyflie_test), and an onboard
     estimate initialised at their simulated start.
+    lighthouse: mocap disabled and lighthouse.yaml's firmware parameters (absolute positions,
+    so the estimate is not initialised: the start check sees where the robot really is).
     """
+    if mode not in MODES:
+        raise ValueError(f"positioning은 {' / '.join(MODES)}입니다.")
+    onboard = mode == "onboard"
     data = copy.deepcopy(hardware)
     for name, robot in data["robots"].items():
         robot["enabled"] = name in names
@@ -75,6 +80,8 @@ def real_robots(hardware, names, homes, offset, onboard=False):
                 home = robot["initial_position"]
                 params["kalman"] = {"initialX": float(home[0]), "initialY": float(home[1]),
                                     "initialZ": float(home[2]), "initialYaw": 0.0, "resetEstimation": 1}
+    if mode == "lighthouse":
+        data = lighthouse_robots(data, names, lighthouse)
     return data
 
 
@@ -95,8 +102,8 @@ def read_decks(uris, timeout=10.0):
     return {uri: "덱 확인 실패" for uri in uris}
 
 
-def check_decks(names, uris, read=read_decks):
-    """Onboard mode needs a positioning deck. Returns (usable names, notes)."""
+def check_decks(names, uris, read=read_decks, wanted=REQUIRED_DECKS["onboard"]):
+    """Onboard and Lighthouse modes need a positioning deck. Returns (usable names, notes)."""
     decks = read([uris[name] for name in names])
     usable, notes = [], []
     for name in names:
@@ -104,12 +111,28 @@ def check_decks(names, uris, read=read_decks):
         if isinstance(result, str):
             notes.append(f"{name}: 덱 확인 실패({result}) - 시뮬레이션만 합니다.")
             continue
-        found = [deck for deck in result if deck in POSITIONING_DECKS]
+        found = [deck for deck in result if deck in wanted]
         if found:
             usable.append(name)
-            notes.append(f"{name}: 모캡 없이 {', '.join(found)} 덱으로 위치 추정")
+            notes.append(f"{name}: {', '.join(found)} 덱으로 위치 측정")
         else:
-            notes.append(f"{name}: 위치 추정 덱(Flow/Lighthouse/Loco)이 없어 모캡 없이는 띄울 수 없음 - 시뮬레이션만 합니다.")
+            notes.append(f"{name}: {'/'.join(wanted)} 덱이 없어 이 위치 측정 방식으로 띄울 수 없음 - 시뮬레이션만 합니다.")
+    return usable, notes
+
+
+def upload_lighthouse(names, uris, system_file, upload=upload_system):
+    """Write the base-station setup to each robot. Robots that fail are not flown. Returns (names, notes)."""
+    if not names or system_file is None:
+        return names, [] if system_file else ["Lighthouse system_file 없음: 기체에 저장된 기지국 설정을 씁니다."]
+    results = upload(system_file, [uris[name] for name in names])
+    usable, notes = [], []
+    for name in names:
+        result = results.get(uris[name], "응답 없음")
+        if result == "ok":
+            usable.append(name)
+            notes.append(f"{name}: Lighthouse 기지국 설정 업로드 완료 ({system_file.name})")
+        else:
+            notes.append(f"{name}: Lighthouse 기지국 설정 업로드 실패({result}) - 시뮬레이션만 합니다.")
     return usable, notes
 
 
@@ -120,9 +143,8 @@ def start(context):
     mode = LaunchConfiguration('obstacles').perform(context)
     if mode not in ('none', 'static', 'dynamic'):
         raise ValueError('obstacles는 none / static / dynamic입니다.')
-    paths = {key: directory / filename for key, filename in (
-        ('robots', 'robots.yaml'), ('planner', 'planner.yaml'), ('goals', 'goals.yaml'),
-        ('obstacles', f'obstacles_{mode}.yaml'), ('mirror', 'mirror.yaml'))}
+    paths = experiment_paths(context, directory, mode)
+    paths['mirror'] = directory / 'mirror.yaml'
     _, settings, homes, _ = load_experiment(paths['robots'], paths['planner'], paths['goals'], paths['obstacles'])
     if LaunchConfiguration('operation').perform(context) != 'run':
         raise ValueError('mirror 모드는 operation:=run만 지원합니다.')
@@ -133,13 +155,16 @@ def start(context):
     argument = LaunchConfiguration('real').perform(context).strip()
     logs = []
     names, notes = select_real(argument, homes, hardware, lambda uris: reachable(uris, log=logs.append))
-    mocap_arg = LaunchConfiguration('mocap').perform(context) or str(config['mocap'])
-    if mocap_arg.lower() not in ('true', 'false'):
-        raise ValueError('mocap은 true/false입니다.')
-    use_mocap = mocap_arg.lower() == 'true'
+    positioning = resolve_positioning(context, config)
+    use_mocap = positioning == 'mocap'
+    lighthouse = load_lighthouse(directory / config.get('lighthouse_file', '../hardware/lighthouse.yaml')) if positioning == 'lighthouse' else None
+    uris = {n: hardware['robots'][n]['uri'] for n in names}
     if names and not use_mocap:
-        names, deck_notes = check_decks(names, {n: hardware['robots'][n]['uri'] for n in names})
+        names, deck_notes = check_decks(names, uris, wanted=REQUIRED_DECKS[positioning])
         notes += deck_notes
+    if names and lighthouse is not None:
+        names, upload_notes = upload_lighthouse(names, uris, lighthouse['system_file'])
+        notes += upload_notes
     offset = [float(v) for v in config['offset']]
     low, high = config['bounds']
     for name in names:
@@ -151,7 +176,7 @@ def start(context):
             raise ValueError('planner.yaml bounds(+offset)가 mirror.yaml의 실기체 bounds보다 넓습니다.')
 
     actions = [LogInfo(msg=f'[mirror] {line}') for line in logs + notes]
-    position_source = 'Qualisys 모캡' if use_mocap else '모캡 없음(기체 자체 추정)'
+    position_source = POSITIONING_LABELS[positioning]
     actions.append(LogInfo(msg=f"[mirror] 실기체: {', '.join(names) if names else '없음'} / 위치: {position_source} / 시뮬레이션: {', '.join(homes)}"))
     # cascade: any simulation process exiting (a closed Gazebo/RViz window, Ctrl+C, a crash) ends
     # the whole simulation. The real side below is a separate process that outlives it and lands.
@@ -168,7 +193,7 @@ def start(context):
     backend = LaunchConfiguration('backend').perform(context) or config['backend']
     if backend not in SERVERS:
         raise ValueError('backend는 cpp 또는 cflib입니다.')
-    robots = real_robots(hardware, names, homes, offset, onboard=not use_mocap)
+    robots = real_robots(hardware, names, homes, offset, mode=positioning, lighthouse=lighthouse)
     server_yaml = Path(get_package_share_directory('crazyflie')) / 'config/server.yaml'
     server = yaml.safe_load(server_yaml.read_text())['/crazyflie_server']['ros__parameters']
     server['robot_description'] = (Path(get_package_share_directory('crazyflie_description'))
@@ -180,7 +205,7 @@ def start(context):
     plan = dict(namespace=namespace, server_package=SERVERS[backend], robots=robots, server=server, mocap=mocap,
                 mirror_arguments=['--mirror', str(paths['mirror']), '--config', str(paths['planner']),
                                   '--robots', str(paths['robots']), '--real', ','.join(names),
-                                  '--namespace', namespace] + ([] if use_mocap else ['--onboard']))
+                                  '--namespace', namespace, '--positioning', positioning])
     PLAN.write_text(json.dumps(plan))
     # setsid --fork: the real launch gets its own session, so stopping the simulation launch
     # (and its process group) never signals the real server while a robot is in the air.
@@ -196,7 +221,9 @@ def generate_launch_description():
         DeclareLaunchArgument('obstacles', default_value='none', description='none / static / dynamic (virtual obstacles)'),
         DeclareLaunchArgument('real', default_value='auto', description='auto (radio scan) / none / cf3,cf5'),
         DeclareLaunchArgument('backend', default_value='', description='cpp / cflib; empty uses mirror.yaml'),
-        DeclareLaunchArgument('mocap', default_value='', description='true (Qualisys) / false (onboard estimate, needs Flow/Lighthouse/Loco deck); empty uses mirror.yaml'),
+        DeclareLaunchArgument('positioning', default_value='', description='mocap (Qualisys) / lighthouse (Lighthouse deck + base stations) / onboard (estimate reset to the start, Flow/Lighthouse/Loco deck); empty uses mirror.yaml'),
+        DeclareLaunchArgument('mocap', default_value='', description='legacy: true = positioning:=mocap, false = positioning:=onboard'),
+        *declare_overrides(),
         # Read by simulation_launch.start
         DeclareLaunchArgument('operation', default_value='run', description='mirror mode always runs SIL'),
         DeclareLaunchArgument('gazebo', default_value='', description='true / false; empty uses simulation.yaml'),

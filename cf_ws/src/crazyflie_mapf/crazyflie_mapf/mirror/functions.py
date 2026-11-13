@@ -210,4 +210,4 @@ class MirrorSupervisor:
             robots[name] = dict(state=robot["state"], reason=robot["reason"], shift=robot["shift"],
                                 blocked=self.ready(name, now) if robot["state"] == WAITING else None,
                                 pose=robot["pose"], target=robot["target"])
-        return dict(version=1, sim_phase=self.phase, mode="onboard" if self.onboard else "mocap", robots=robots)
+        return dict(version=1, sim_phase=self.phase, mode=self.settings.get("mode", "onboard" if self.onboard else "mocap"), robots=robots)

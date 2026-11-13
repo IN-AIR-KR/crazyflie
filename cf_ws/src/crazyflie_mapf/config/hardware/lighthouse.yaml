@@ -1,0 +1,24 @@
+# Lighthouse 위치 측정 설정 (positioning: lighthouse일 때 사용).
+# hardware.launch.py와 mirror.launch.py가 함께 쓴다. 상대 경로는 이 폴더 기준이다.
+#
+# 준비:
+#   1. 모든 기체에 Lighthouse 덱을 단다. 기지국(V2 권장)은 비행 공간 전체를 보도록 설치한다.
+#   2. cfclient Lighthouse 탭에서 기지국 geometry를 추정한다. 이때 정한 원점과 축이
+#      planner의 world 좌표가 된다. 원점은 비행 공간 중앙 바닥, +x는 cf1의 목적지 방향으로 잡는다.
+#      (mapf 시작점과 목적지는 이 좌표 기준이므로, 실제 바닥에도 같은 원점을 표시해 둔다.)
+#   3. "Save system config"로 저장한 파일을 이 폴더에 두고 system_file에 적는다.
+#      launch할 때 켜진 모든 기체에 업로드된다. 비우면 기체에 이미 저장된 값을 쓴다.
+#
+# 시작 위치 검사는 모캡과 같다: 기체가 시작점(+offset)에서 home_tolerance 안에 있어야 이륙한다.
+
+system_file: ""            # 예: lighthouse_system.yaml (cfclient에서 저장한 기지국 설정)
+upload_system: true        # false면 system_file이 있어도 업로드하지 않는다.
+
+# Lighthouse 기체에만 적용되는 firmware 파라미터. robots.yaml의 all.firmware_params 위에 덮어쓴다.
+firmware_params:
+  stabilizer:
+    estimator: 2           # Kalman (Lighthouse 필수)
+    controller: 2          # Mellinger: cmdFullState 추종. 흔들리면 1(PID)로 바꾼다.
+  lighthouse:
+    method: 1              # 0: crossing beam, 1: sweep angles (기본, 기지국 1대만 보여도 동작)
+# 기지국 종류(V1/V2, lighthouse.systemType)는 system_file과 cfclient 설정을 따른다. 여기서 바꾸지 않는다.

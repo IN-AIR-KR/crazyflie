@@ -10,7 +10,7 @@ from xml.sax.saxutils import escape
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, EmitEvent, IncludeLaunchDescription, OpaqueFunction, RegisterEventHandler, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, EmitEvent, IncludeLaunchDescription, LogInfo, OpaqueFunction, RegisterEventHandler, SetEnvironmentVariable
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -18,15 +18,15 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 from crazyflie_mapf.common.obstacles import box_sdf
+from crazyflie_mapf.common.overrides import declare, describe, experiment_paths
 from crazyflie_mapf.common.trajectory import load_experiment, read_mapping
 
 
 def start(context, mode, cascade=True, require_start=False):
     """cascade=False keeps the other processes alive when one exits (needed with real robots)."""
     directory = Path(LaunchConfiguration('config_dir').perform(context)).resolve()
-    paths = {key: directory / filename for key, filename in (
-        ('robots', 'robots.yaml'), ('planner', 'planner.yaml'), ('goals', 'goals.yaml'), ('obstacles', f'obstacles_{mode}.yaml'))}
-    robots, settings, homes, _ = load_experiment(paths['robots'], paths['planner'], paths['goals'], paths['obstacles'])
+    paths = experiment_paths(context, directory, mode)
+    robots, settings, homes, goals = load_experiment(paths['robots'], paths['planner'], paths['goals'], paths['obstacles'])
     if mode == 'none' and settings['obstacles']:
         raise ValueError('장애물 없는 모드에서는 obstacles: []를 사용하세요.')
     if mode == 'static' and any('motion' in o for o in settings['obstacles']):
@@ -47,7 +47,7 @@ def start(context, mode, cascade=True, require_start=False):
         return simulation[name]
 
     gazebo, gazebo_gui, rviz = flag('gazebo'), flag('gazebo_gui'), flag('rviz')
-    actions = []
+    actions = [LogInfo(msg=f'[mapf] {line}') for line in describe(homes, goals)]
     if gazebo and operation == 'run':
         # All Gazebo processes in this local SIL experiment share one interface.
         # Auto-detection can select docker0 instead of the active local interface.
@@ -155,5 +155,6 @@ def generate_launch_description(mode="static"):
         DeclareLaunchArgument('gazebo_gui', default_value='', description='true / false; empty uses simulation.yaml'),
         DeclareLaunchArgument('rviz', default_value='', description='true / false; empty uses simulation.yaml'),
         DeclareLaunchArgument('software_rendering', default_value='', description='true / false (GPU); empty uses simulation.yaml'),
+        *declare(),
         OpaqueFunction(function=partial(start, mode=mode)),
     ])

@@ -3,9 +3,12 @@
 hardware_robots: ../hardware/robots.yaml
 motion_capture_file: ../hardware/motion_capture.yaml
 backend: cpp          # 실기체 서버: cpp 또는 cflib
-# Qualisys 사용 여부. false면 기체 자체 위치 추정(Flow/Lighthouse/Loco 덱 필요)으로 시뮬레이션 동작을 재현한다.
-# launch 인자 mocap:=true/false가 우선한다.
-mocap: true
+# 실기체 위치 측정 방식. launch 인자 positioning:=...가 우선한다 (예전 인자 mocap:=true/false도 동작).
+#   mocap       Qualisys 모캡 (motion_capture_file)
+#   lighthouse  Lighthouse 덱 + 기지국 (lighthouse_file). 모캡처럼 시작점에 정확히 놓아야 이륙한다.
+#   onboard     기체 자체 추정을 시작점으로 초기화 (Flow/Lighthouse/Loco 덱). 놓인 자리로 경로를 옮긴다.
+positioning: mocap
+lighthouse_file: ../hardware/lighthouse.yaml
 namespace: real       # 실기체 서버의 ROS 이름공간 (/real/cf3/...)
 
 # 실기체 좌표 = 시뮬레이션 좌표 + offset [m]. 실험실 원점이 다르면 x, y를 조정한다.
